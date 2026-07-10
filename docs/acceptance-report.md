@@ -11,7 +11,7 @@
 | 输入 / 输出 | 190 / 190 行 |
 | 标准结果 | CSV + Parquet |
 | 统计结果 | 能源分布、车身分布、价格统计 |
-| 自动测试 | 13 passed |
+| 自动测试 | 14 passed |
 
 运行证据保存在 `data/processed/metadata.json` 和 `data/processed/stats.json`。
 
