@@ -4,15 +4,15 @@
 
 ## 已完成功能
 
-- 84 款公开车型原始快照，保留来源页面和抓取日期；
-- PySpark 4.0.3 清洗、枚举映射、价格换算、衍生场景标签、CSV/Parquet 输出；
+- 16888（车主之家）144 个车系、190 条车系能源记录快照，保留参数页、销量页和抓取日期；
+- PySpark 4.0.3 清洗、枚举映射、销量热度归一化、衍生场景标签、CSV/Parquet 输出；
 - 输入预算、车身、能源、品牌、场景、座位数；
 - 硬性筛选、权重归一化评分、稳定排序和显式条件放宽；
 - 3—5 款推荐卡片、匹配分、至少两条数据依据；
 - 2—3 款车型参数表和雷达图对比；
 - Spark 车型库能源/车身分布图；
 - OpenAI 兼容说明接口、超时处理和模板化降级；
-- 健康检查、推荐、对比接口及 10 项自动化测试。
+- 健康检查、推荐、对比接口及 13 项自动化测试。
 
 ## 一键运行
 
@@ -49,7 +49,7 @@ make spark
 - Spark 统计：`data/processed/stats.json`
 - 运行元数据：`data/processed/metadata.json`
 
-元数据记录 Spark 版本、运行时间、输入 SHA-256、固定换算汇率和输入/输出行数。价格为公开页面美元起售价按固定 `1 USD = 7.20 CNY` 换算的课程演示值，不是实时成交价。
+元数据记录 Spark 版本、运行时间、输入 SHA-256、数据源和输入/输出行数。价格为 16888 抓取时公开展示的万元指导价区间，销量为公开销量页的最近月度值；两者都不是实时成交或上牌数据。
 
 ## DeepSeek 推荐说明
 
@@ -98,5 +98,7 @@ docs/                     MVP、契约、设计和验收记录
 - [MVP 方案](docs/MVP.md)
 - [接口约定](docs/api-contract.md)
 - [数据字典](docs/data-dictionary.md)
+- [16888 数据采集说明](docs/data-acquisition-16888.md)
 - [推荐算法](docs/recommendation-design.md)
 - [验收记录](docs/acceptance-report.md)
+- [课程交付材料填写指南](docs/deliverables-fill-guide.md)

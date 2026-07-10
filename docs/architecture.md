@@ -12,18 +12,19 @@
 
 ```mermaid
 flowchart LR
-    A["汽车原始 CSV/JSON"] --> B["PySpark 清洗与特征处理"]
-    B --> C["标准 CSV/Parquet 数据集"]
-    C --> D["条件筛选与加权评分"]
-    E["消费者输入条件"] --> D
-    D --> F["结构化推荐结果"]
-    F --> G["模板推荐原因"]
-    F --> H["可选大模型润色"]
-    H -->|"失败或超时"| G
-    F --> I["Flask + Web 页面"]
-    G --> I
-    H --> I
-    I --> J["推荐卡片、车型对比、ECharts"]
+    A["16888 公开车系/参数/销量页面"] --> B["低频采集为原始 CSV 快照"]
+    B --> C["PySpark 清洗与特征处理"]
+    C --> D["标准 CSV/Parquet 数据集"]
+    D --> E["条件筛选与加权评分"]
+    F["消费者输入条件"] --> E
+    E --> G["结构化推荐结果"]
+    G --> H["模板推荐原因"]
+    G --> I["可选 DeepSeek 润色"]
+    I -->|"失败或超时"| H
+    G --> J["Flask + Web 页面"]
+    H --> J
+    I --> J
+    J --> K["推荐卡片、车型对比、ECharts"]
 ```
 
 ## 3. 模块边界
@@ -46,13 +47,14 @@ flowchart LR
 
 ## 4. 数据流
 
-1. Spark 数据工程师把数据放入 `data/raw/`；
-2. 运行 PySpark 清洗任务；
-3. 任务输出 `data/processed/cars.parquet` 或等价文件；
-4. 推荐模块加载标准数据并执行筛选和评分；
-5. Flask 按 `api-contract.md` 接收条件并返回结果；
-6. 页面展示推荐卡片和对比图；
-7. 如果启用大模型，仅把结构化依据发送给模型进行文字改写。
+1. `scripts/fetch_16888_dataset.py` 低频读取有限范围的公开车系、参数和销量页面；
+2. 原始快照保存到 `data/raw/16888_cars_snapshot.csv`，不在原文件上修改；
+3. 运行 PySpark 清洗任务；
+4. 任务输出 `data/processed/cars.csv`、`cars.parquet/` 和统计证据；
+5. 推荐模块加载标准数据并执行筛选和评分；
+6. Flask 按 `api-contract.md` 接收条件并返回结果；
+7. 页面展示推荐卡片和对比图；
+8. 如果启用 DeepSeek，仅把结构化依据发送给模型进行文字改写。
 
 ## 5. 最小运行方式
 
