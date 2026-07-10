@@ -29,3 +29,9 @@
 - 算法权重变化时同步更新 `docs/recommendation-design.md`。
 - 每次提交只包含一个相对独立的模块或文档变更。
 - 不提交 API Key、密码、个人令牌、原始大体积数据和本地环境文件。
+
+## 文档约束
+
+- Markdown 是所有项目文档的唯一可编辑源格式；每个 PDF 必须由同名 `.md` 文件转换生成。
+- 禁止直接编辑 PDF；统一使用 `scripts/markdown_to_pdf.py` 或对应的 `make pdf` 目标重新生成。
+- Markdown 更新后若存在对应 PDF，必须同步重新生成并完成页面渲染检查后再提交。

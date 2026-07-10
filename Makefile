@@ -1,6 +1,7 @@
 PYTHON ?= python3
+PDF_TARGETS := $(wildcard docs/*.pdf)
 
-.PHONY: setup data spark run test
+.PHONY: setup data spark pdf run test
 
 setup:
 	$(PYTHON) -m venv .venv
@@ -12,6 +13,11 @@ data:
 
 spark:
 	.venv/bin/python -m src.spark_jobs.clean_cars
+
+pdf: $(PDF_TARGETS)
+
+docs/%.pdf: docs/%.md scripts/markdown_to_pdf.py
+	.venv/bin/python scripts/markdown_to_pdf.py $< $@
 
 run:
 	.venv/bin/python -m src.web.app

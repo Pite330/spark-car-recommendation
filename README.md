@@ -12,7 +12,7 @@
 - 2—3 款车型参数表和雷达图对比；
 - Spark 车型库能源/车身分布图；
 - OpenAI 兼容说明接口、超时处理和模板化降级；
-- 健康检查、推荐、对比接口及 13 项自动化测试。
+- 健康检查、推荐、对比接口及 14 项自动化测试。
 
 ## 一键运行
 
@@ -21,6 +21,7 @@
 ```bash
 make setup
 make spark
+make pdf
 make test
 make run
 ```
@@ -102,3 +103,5 @@ docs/                     MVP、契约、设计和验收记录
 - [推荐算法](docs/recommendation-design.md)
 - [验收记录](docs/acceptance-report.md)
 - [课程交付材料填写指南](docs/deliverables-fill-guide.md)
+
+所有 PDF 都由同名 Markdown 生成，禁止直接编辑 PDF。更新 `docs/MVP.md` 后执行 `make pdf` 同步生成 `docs/MVP.pdf`。
