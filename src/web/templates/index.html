@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="基于 Spark 数据处理与确定性评分的轻量购车推荐系统">
+    <title>选车罗盘 · Spark 汽车推荐</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <header class="topbar shell">
+      <a class="brand" href="#top" aria-label="返回顶部">
+        <span class="brand-mark">↗</span>
+        <span>选车罗盘</span>
+      </a>
+      <div class="status-pill" id="system-status">
+        <span class="status-dot"></span>
+        <span>{{ catalog.car_count }} 款车型已就绪</span>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="hero shell">
+        <div class="hero-copy">
+          <p class="eyebrow">SPARK-POWERED · DETERMINISTIC</p>
+          <h1>把复杂参数，<br><span>变成清晰选择。</span></h1>
+          <p class="hero-lead">输入真实预算和少量偏好，系统会从 Spark 清洗后的公开车型快照中，给出可复现、能解释的 3—5 款候选。</p>
+          <div class="trust-row">
+            <span>✓ 无需登录</span>
+            <span>✓ 规则透明</span>
+            <span>✓ 大模型可关闭</span>
+          </div>
+        </div>
+        <aside class="data-card">
+          <div class="data-card-head">
+            <span>数据概览</span>
+            <span class="live-label">LOCAL DATA</span>
+          </div>
+          <strong>{{ catalog.car_count }}</strong>
+          <p>款公开车型快照</p>
+          <div class="mini-metrics">
+            <div><b>{{ catalog.energy_types|length }}</b><span>能源类型</span></div>
+            <div><b>{{ catalog.body_types|length }}</b><span>车身类型</span></div>
+            <div><b>{{ catalog.brands|length }}</b><span>品牌</span></div>
+          </div>
+          <div class="spark-line"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+          <small>价格为数据快照的固定汇率换算，仅用于课程演示</small>
+        </aside>
+      </section>
+
+      <section class="workspace shell" id="recommendation-workspace">
+        <div class="section-heading">
+          <div>
+            <p class="step-label">01 / 填写条件</p>
+            <h2>你真正需要什么？</h2>
+          </div>
+          <p>预算是唯一必填项。选择越具体，筛选越准确。</p>
+        </div>
+
+        {% if dataset_error %}
+          <div class="alert error">{{ dataset_error }}</div>
+        {% endif %}
+
+        <form id="recommend-form" class="preference-card">
+          <div class="field budget-field">
+            <label>预算区间 <em>必填</em></label>
+            <div class="budget-inputs">
+              <div><input name="budget_min_wan" type="number" min="1" step="0.1" value="15" required><span>万元</span></div>
+              <b>—</b>
+              <div><input name="budget_max_wan" type="number" min="1" step="0.1" value="20" required><span>万元</span></div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="body_type">车身类型</label>
+            <select id="body_type" name="body_type">
+              <option value="">不限</option>
+              {% for value in catalog.body_types %}<option value="{{ value }}"{% if value == 'SUV' %} selected{% endif %}>{{ value }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="energy_type">能源类型</label>
+            <select id="energy_type" name="energy_type">
+              <option value="">不限</option>
+              {% for value in catalog.energy_types %}<option value="{{ value }}"{% if value == '纯电' %} selected{% endif %}>{{ value }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="scenario">主要场景</label>
+            <select id="scenario" name="scenario">
+              <option value="">不限</option>
+              <option value="城市通勤" selected>城市通勤</option>
+              <option value="家庭出行">家庭出行</option>
+              <option value="长途出行">长途出行</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="brand-select">品牌偏好</label>
+            <select id="brand-select" name="brand">
+              <option value="">不限</option>
+              {% for value in catalog.brands %}<option value="{{ value }}">{{ value }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="field">
+            <label for="min_seats">最低座位数</label>
+            <select id="min_seats" name="min_seats">
+              <option value="">不限</option>
+              <option value="4">4 座</option>
+              <option value="5">5 座</option>
+              <option value="6">6 座</option>
+              <option value="7">7 座</option>
+            </select>
+          </div>
+          <div class="form-actions">
+            <label class="switch-row" title="未配置或请求失败时自动使用模板说明">
+              <input id="use_llm" name="use_llm" type="checkbox" {% if not llm_enabled %}disabled{% endif %}>
+              <span class="switch"></span>
+              <span>{{ llm_label }} 说明 <small>{{ llm_model if llm_enabled else '未配置' }}</small></span>
+            </label>
+            <button class="primary-button" type="submit" {% if dataset_error %}disabled{% endif %}>
+              <span>开始推荐</span><b>→</b>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="results shell is-hidden" id="results-section" aria-live="polite">
+        <div class="section-heading">
+          <div>
+            <p class="step-label">02 / 推荐结果</p>
+            <h2>为你筛出的候选</h2>
+          </div>
+          <p id="result-summary"></p>
+        </div>
+        <div id="relaxed-note" class="alert warning is-hidden"></div>
+        <div id="recommendation-grid" class="recommendation-grid"></div>
+        <div class="compare-bar" id="compare-bar">
+          <div><strong id="compare-count">0</strong><span>已选车型</span></div>
+          <p>选择 2—3 款车型，查看参数横向对比</p>
+          <button id="compare-button" type="button" disabled>开始对比 <span>→</span></button>
+        </div>
+      </section>
+
+      <section class="comparison shell is-hidden" id="comparison-section">
+        <div class="section-heading">
+          <div><p class="step-label">03 / 车型对比</p><h2>关键参数，一眼看清</h2></div>
+          <button class="text-button" id="close-comparison" type="button">收起对比 ×</button>
+        </div>
+        <div class="comparison-layout">
+          <div class="comparison-table-wrap"><table id="comparison-table"></table></div>
+          <div class="chart-panel">
+            <div><span>参数相对值</span><small>仅比较已存在字段</small></div>
+            <div id="comparison-chart" class="chart"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="insight shell">
+        <div class="section-heading compact">
+          <div><p class="step-label">SPARK / 数据统计</p><h2>看懂当前车型库</h2></div>
+          <p>图表由 Spark 标准数据生成，反映当前离线快照。</p>
+        </div>
+        <div class="insight-grid">
+          <article><div><h3>能源类型分布</h3><p>当前车型库的动力结构</p></div><div id="energy-chart" class="chart"></div></article>
+          <article><div><h3>车身类型分布</h3><p>不同用车形态的样本数量</p></div><div id="body-chart" class="chart"></div></article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="shell">
+      <span>选车罗盘 · Spark Car Recommendation MVP</span>
+      <span>确定性算法 · 公开数据快照 · 本地优先</span>
+    </footer>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script>window.CATALOG = {{ catalog|tojson }};</script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>

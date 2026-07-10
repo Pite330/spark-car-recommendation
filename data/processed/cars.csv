@@ -1,0 +1,85 @@
+car_id,model_name,brand,price_min_wan,price_max_wan,price_mid_wan,body_type,energy_type,seats,range_km,fuel_consumption,horsepower,model_year,sales,heat_score,normalized_heat,scenario_tags,data_completeness,source,source_url,updated_at
+car_01bece84eed9,Exeed VX,Exeed,20.59,20.59,20.59,SUV,燃油,7,,,261,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/exeed-vx,2026-07-10
+car_084b8bc5f16a,MG HS,MG,12.73,12.73,12.73,SUV,燃油,5,,,228,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/mg-hs,2026-07-10
+car_0bbba7269d01,BYD Qin Plus DM-i,BYD,8.47,8.47,8.47,轿车,插混,5,55.0,,110,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-qin-plus,2026-07-10
+car_0c92b5e1ae70,Tank 300,Great Wall (GWM),21.22,21.22,21.22,SUV,燃油,5,,,220,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/tank-300,2026-07-10
+car_0e525c1d7e61,Geely Xingyue L,Geely,14.62,14.62,14.62,SUV,混动,5,,,238,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/geely-xingyue-l,2026-07-10
+car_0ee523dafead,Changan UNI-K,Changan,16.45,16.45,16.45,SUV,燃油,5,,,233,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/changan-uni-k,2026-07-10
+car_110cebea5cf7,Zeekr 001,Zeekr,28.57,28.57,28.57,旅行车,纯电,5,705.0,,789,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/zeekr-001,2026-07-10
+car_15d50903e433,Leapmotor C11,Leapmotor,15.91,15.91,15.91,SUV,纯电,5,550.0,,272,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/leapmotor-c11,2026-07-10
+car_199b53f0fcaf,MG ZS,MG,8.49,8.49,8.49,SUV,燃油,5,,,169,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/mg-zs,2026-07-10
+car_1b5a55d97c08,Voyah Free,Voyah,28.34,28.34,28.34,SUV,增程,5,200.0,,694,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/voyah-free,2026-07-10
+car_1c77ff8041f9,XPeng G6,XPeng,19.1,19.1,19.1,SUV,纯电,5,580.0,,296,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/xpeng-g6,2026-07-10
+car_1e9951d82bb6,Changan CS75 Plus,Changan,11.25,11.25,11.25,SUV,燃油,5,,,233,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/changan-cs75-plus,2026-07-10
+car_1faeb551ee4a,Jetour X70,Jetour,9.55,9.55,9.55,SUV,燃油,7,,,197,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/jetour-x70,2026-07-10
+car_1fe4d64bc869,NIO ET7,NIO,45.45,45.45,45.45,轿车,纯电,5,675.0,,644,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/nio-et7,2026-07-10
+car_21208688d34b,Li Auto Mega,Li Auto,59.45,59.45,59.45,MPV,纯电,7,710.0,,536,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/li-mega,2026-07-10
+car_295b490eeb72,ORA Good Cat,Great Wall (GWM),11.24,11.24,11.24,两厢车,纯电,5,420.0,,143,2024,,,,城市通勤,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/ora-good-cat,2026-07-10
+car_29c0706c8f0a,Li Auto L9,Li Auto,43.52,43.52,43.52,SUV,增程,6,215.0,,449,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/li-l9,2026-07-10
+car_2bffbc9592e4,BYD Seal,BYD,19.09,19.09,19.09,轿车,纯电,5,550.0,,530,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-seal,2026-07-10
+car_3511ce148f15,MG4 EV (Mulan),MG,12.72,12.72,12.72,两厢车,纯电,5,425.0,,170,2024,,,,城市通勤,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/mg4,2026-07-10
+car_359c6645ee08,BYD Atto 3 (Yuan Plus),BYD,12.72,12.72,12.72,SUV,纯电,5,430.0,,201,2024,,,,城市通勤|家庭出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-atto-3,2026-07-10
+car_36fa17a78670,Haval Dargo (Big Dog),Great Wall (GWM),13.16,13.16,13.16,SUV,燃油,5,,,211,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/haval-dargo,2026-07-10
+car_3748db56e17a,Chery Tiggo 8 Pro,Chery,15.92,15.92,15.92,SUV,燃油,7,,,261,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/chery-tiggo-8,2026-07-10
+car_37826ff59b62,Leapmotor C10,Leapmotor,13.68,13.68,13.68,SUV,增程,5,210.0,,215,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/leapmotor-c10,2026-07-10
+car_3ff7f8ee46f9,BYD Song Plus DM-i,BYD,14.85,14.85,14.85,SUV,插混,5,110.0,,235,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-song-plus,2026-07-10
+car_428fa0fc3e76,Lynk & Co 08,Lynk & Co,20.05,20.05,20.05,SUV,插混,5,245.0,,489,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/lynkco-08,2026-07-10
+car_42cb093677d4,Geely Boyue (Atlas),Geely,9.85,9.85,9.85,SUV,燃油,5,,,184,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/geely-boyue,2026-07-10
+car_4a263ed6965a,XPeng Mona M03,XPeng,12.72,12.72,12.72,轿车,纯电,5,515.0,,188,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/xpeng-mona-m03,2026-07-10
+car_5cc3c0a8f9a7,BYD Dolphin,BYD,10.6,10.6,10.6,两厢车,纯电,5,420.0,,95,2024,,,,城市通勤,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-dolphin,2026-07-10
+car_639e680d69a4,XPeng P7,XPeng,22.28,22.28,22.28,轿车,纯电,5,706.0,,348,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/xpeng-p7,2026-07-10
+car_63bbb454e074,Wuling Bingo,Wuling,6.35,6.35,6.35,两厢车,纯电,5,410.0,,100,2024,,,,城市通勤,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/wuling-bingo,2026-07-10
+car_64374fdfef70,Geely Galaxy E5,Geely,11.66,11.66,11.66,SUV,纯电,5,530.0,,218,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/geely-galaxy-e5,2026-07-10
+car_676127db8e18,Hongqi HS5,Hongqi,14.74,14.74,14.74,SUV,燃油,5,,,252,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/hongqi-hs5,2026-07-10
+car_6a08ea66f0d6,Hongqi E-HS9,Hongqi,54.14,54.14,54.14,SUV,纯电,7,460.0,,543,2024,,,,城市通勤|家庭出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/hongqi-e-hs9,2026-07-10
+car_6bd4b46698a9,Jetour Traveller (T2),Jetour,14.86,14.86,14.86,SUV,燃油,5,,,254,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/jetour-traveller,2026-07-10
+car_6c53c7395d26,Chery Arrizo 8,Chery,11.67,11.67,11.67,轿车,燃油,5,,,261,2024,,,,城市通勤|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/chery-arrizo-8,2026-07-10
+car_6d36369722cc,Wuling Hongguang Mini EV,Wuling,3.48,3.48,3.48,两厢车,纯电,4,215.0,,41,2024,,,,"",1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/wuling-mini-ev,2026-07-10
+car_72b2e56e3760,Geely Panda Mini EV,Geely,4.24,4.24,4.24,两厢车,纯电,4,200.0,,41,2024,,,,"",1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/geely-panda-mini,2026-07-10
+car_754cf1e7ddab,Haval H6,Great Wall (GWM),10.61,10.61,10.61,SUV,燃油,5,,,204,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/haval-h6,2026-07-10
+car_779178a2a923,Denza N7,Denza,25.47,25.47,25.47,SUV,纯电,5,630.0,,643,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/denza-n7,2026-07-10
+car_7d8eaa72e243,NIO ES8,NIO,52.88,52.88,52.88,SUV,纯电,6,605.0,,644,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/nio-es8,2026-07-10
+car_7e4b2abf902e,Jetour Dashing,Jetour,10.61,10.61,10.61,SUV,燃油,5,,,254,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/jetour-dashing,2026-07-10
+car_8403c071c8d1,Yangwang U8,Yangwang,116.6,116.6,116.6,SUV,增程,5,180.0,,1180,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/yangwang-u8,2026-07-10
+car_86d7f0936506,Li Auto L7,Li Auto,32.05,32.05,32.05,SUV,增程,5,210.0,,449,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/li-l7,2026-07-10
+car_8c37ac9cbd5c,Geely Coolray (Binyue),Geely,9.32,9.32,9.32,SUV,燃油,5,,,177,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/geely-coolray,2026-07-10
+car_95f712f94659,Geely Emgrand,Geely,7.42,7.42,7.42,轿车,燃油,5,,,122,2024,,,,城市通勤|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/geely-emgrand,2026-07-10
+car_9b4e6deda37d,Zeekr 007,Zeekr,22.29,22.29,22.29,轿车,纯电,5,688.0,,646,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/zeekr-007,2026-07-10
+car_9b73a5ffc4c7,Deepal S07,Changan,15.92,15.92,15.92,SUV,增程,5,200.0,,254,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/deepal-s7,2026-07-10
+car_9da5505e61ef,Yangwang U9,Yangwang,178.41,178.41,178.41,跑车,纯电,2,465.0,,1300,2024,,,,城市通勤,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/yangwang-u9,2026-07-10
+car_a28512cf81d7,GAC Aion Y,GAC Aion,11.66,11.66,11.66,SUV,纯电,5,510.0,,204,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/aion-y,2026-07-10
+car_a3816517e781,Zeekr X,Zeekr,20.16,20.16,20.16,SUV,纯电,5,560.0,,268,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/zeekr-x,2026-07-10
+car_ad19ba883fa3,Onvo L60,Onvo,21.97,21.97,21.97,SUV,纯电,5,555.0,,240,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/onvo-l60,2026-07-10
+car_af31d338940c,MG5,MG,8.7,8.7,8.7,轿车,燃油,5,,,114,2024,,,,城市通勤|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/mg5,2026-07-10
+car_afacc6d14074,Zeekr 009,Zeekr,46.62,46.62,46.62,MPV,纯电,7,702.0,,789,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/zeekr-009,2026-07-10
+car_aff8129b4f0d,Haval Jolion,Great Wall (GWM),8.38,8.38,8.38,SUV,燃油,5,,,150,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/haval-jolion,2026-07-10
+car_b2b0c154ecd2,Omoda 5 / C5,Omoda,9.87,9.87,9.87,SUV,燃油,5,,,197,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/omoda-5,2026-07-10
+car_b52fbc721aef,NIO ET5,NIO,31.65,31.65,31.65,轿车,纯电,5,560.0,,489,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/nio-et5,2026-07-10
+car_b8de6ef68524,Zeekr 7X,Zeekr,24.41,24.41,24.41,SUV,纯电,5,780.0,,636,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/zeekr-7x,2026-07-10
+car_b941d58bd533,Voyah Dreamer,Voyah,38.22,38.22,38.22,MPV,增程,7,180.0,,435,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/voyah-dreamer,2026-07-10
+car_b99442d19b36,Tank 500,Great Wall (GWM),35.58,35.58,35.58,SUV,燃油,7,,,354,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/tank-500,2026-07-10
+car_bfbd245369ce,Xiaomi SU7,Xiaomi,22.93,22.93,22.93,轿车,纯电,5,700.0,,299,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/xiaomi-su7,2026-07-10
+car_c245ec56da4e,Changan CS55 Plus,Changan,9.87,9.87,9.87,SUV,燃油,5,,,185,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/changan-cs55-plus,2026-07-10
+car_c256046b5002,BYD Song Pro DM-i,BYD,11.66,11.66,11.66,SUV,插混,5,110.0,,197,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-song-pro,2026-07-10
+car_c3f4dc319dc8,BYD Shark 6,BYD,28.35,28.35,28.35,皮卡,插混,5,100.0,,430,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-shark,2026-07-10
+car_c4aee85d7c3b,BYD Yuan Up,BYD,10.28,10.28,10.28,SUV,纯电,5,401.0,,130,2024,,,,城市通勤|家庭出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-yuan-up,2026-07-10
+car_c4ca58fd6959,Chery Tiggo 7 Plus,Chery,9.76,9.76,9.76,SUV,燃油,5,,,197,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/chery-tiggo-7,2026-07-10
+car_cc1531ac3d71,GAC Aion V,GAC Aion,13.78,13.78,13.78,SUV,纯电,5,600.0,,201,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/aion-v,2026-07-10
+car_d2a618d0a09f,XPeng G9,XPeng,28.02,28.02,28.02,SUV,纯电,5,702.0,,551,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/xpeng-g9,2026-07-10
+car_d6c3c20ce166,Lynk & Co 09,Lynk & Co,25.47,25.47,25.47,SUV,插混,7,150.0,,254,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/lynkco-09,2026-07-10
+car_db404a6db6be,BYD Tang,BYD,22.28,22.28,22.28,SUV,插混,7,215.0,,489,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-tang,2026-07-10
+car_de1679606266,Denza D9,Denza,36.08,36.08,36.08,MPV,插混,7,190.0,,374,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/denza-d9,2026-07-10
+car_df0a7b891a49,BYD Han,BYD,19.09,19.09,19.09,轿车,纯电,5,605.0,,516,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-han,2026-07-10
+car_dfd0b5a8416d,NIO ES6,NIO,35.89,35.89,35.89,SUV,纯电,5,490.0,,489,2024,,,,城市通勤|家庭出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/nio-es6,2026-07-10
+car_e442ede065b5,Avatr 12,Avatr,28.66,28.66,28.66,轿车,纯电,5,700.0,,578,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/avatr-12,2026-07-10
+car_e92586f20232,BYD Seagull,BYD,7.41,7.41,7.41,两厢车,纯电,5,405.0,,75,2024,,,,城市通勤,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-seagull,2026-07-10
+car_ea7216e04aeb,Hongqi H9,Hongqi,32.9,32.9,32.9,轿车,燃油,5,,,252,2024,,,,城市通勤|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/hongqi-h9,2026-07-10
+car_edafd3c27043,GAC Trumpchi GS8,GAC Trumpchi,16.97,16.97,16.97,SUV,混动,7,,,248,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/gac-gs8,2026-07-10
+car_f0172c894504,BYD Frigate 07,BYD,19.09,19.09,19.09,SUV,插混,5,125.0,,218,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-frigate-07,2026-07-10
+car_f59237fabf3f,Xiaomi YU7,Xiaomi,26.92,26.92,26.92,SUV,纯电,5,835.0,,320,2025,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/xiaomi-yu7,2026-07-10
+car_fa1bf3ef21dc,DFSK K01,DFSK,1.44,1.44,1.44,皮卡,燃油,2,,,53,2024,,,,城市通勤|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/dfsk-k01,2026-07-10
+car_fade44d5e97b,Avatr 11,Avatr,28.66,28.66,28.66,SUV,纯电,5,705.0,,578,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/avatr-11,2026-07-10
+car_fc2c78d1cc28,GAC Aion S,GAC Aion,10.6,10.6,10.6,轿车,纯电,5,510.0,,184,2024,,,,城市通勤|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/aion-s,2026-07-10
+car_fc4803f1d4f1,Li Auto L6,Li Auto,26.53,26.53,26.53,SUV,增程,5,212.0,,408,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/li-l6,2026-07-10
+car_fc482464cda8,BYD Sea Lion 07,BYD,20.16,20.16,20.16,SUV,纯电,5,610.0,,230,2024,,,,城市通勤|家庭出行|长途出行,1.0,chinacarprices.com public model listing,https://chinacarprices.com/models/byd-sea-lion-07,2026-07-10
+car_fd2ee500363f,Jaecoo J7,Jaecoo,13.79,13.79,13.79,SUV,燃油,5,,,197,2024,,,,城市通勤|家庭出行|长途出行,0.9,chinacarprices.com public model listing,https://chinacarprices.com/models/jaecoo-j7,2026-07-10

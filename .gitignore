@@ -18,13 +18,22 @@ venv/
 # Runtime output
 logs/
 tmp/
+scratch/
 *.log
 
-# Generated data
+# Generated data: keep the reproducible MVP snapshot and evidence only
 data/raw/*
-data/processed/*
 !data/raw/.gitkeep
+!data/raw/china_car_prices_snapshot.csv
+data/processed/*
 !data/processed/.gitkeep
+!data/processed/cars.csv
+!data/processed/cars.parquet/
+!data/processed/cars.parquet/**
+!data/processed/metadata.json
+!data/processed/stats.json
+*.crc
 
 # Generated reports and screenshots
 output/
+data/processed/_spark_tmp/
