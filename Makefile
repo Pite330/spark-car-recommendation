@@ -8,7 +8,7 @@ setup:
 	.venv/bin/python -m pip install -r requirements.txt
 
 data:
-	.venv/bin/python scripts/fetch_public_dataset.py
+	.venv/bin/python scripts/fetch_16888_dataset.py
 
 spark:
 	.venv/bin/python -m src.spark_jobs.clean_cars

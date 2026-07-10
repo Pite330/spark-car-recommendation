@@ -24,7 +24,7 @@ scratch/
 # Generated data: keep the reproducible MVP snapshot and evidence only
 data/raw/*
 !data/raw/.gitkeep
-!data/raw/china_car_prices_snapshot.csv
+!data/raw/16888_cars_snapshot.csv
 data/processed/*
 !data/processed/.gitkeep
 !data/processed/cars.csv
