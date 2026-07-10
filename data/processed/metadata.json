@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-10T16:44:48+08:00",
+  "generated_at": "2026-07-10T19:32:44+08:00",
   "spark_version": "4.0.3",
-  "input_file": "data/raw/china_car_prices_snapshot.csv",
-  "input_sha256": "3939a4ec864f9ab690e4e08aadd1cfd467760e22ff8f3d78137c6d5aa33ee9d6",
+  "data_source": "16888.com 车主之家",
+  "input_file": "data/raw/16888_cars_snapshot.csv",
+  "input_sha256": "30880be0156f2c4c627a99f731cc15921a6f180f5e3c5c6b9cbca8878933ae69",
   "output_file": "data/processed/cars.csv",
-  "usd_to_cny_fixed_rate": 7.2,
-  "input_rows": 84,
-  "output_rows": 84,
+  "input_rows": 190,
+  "output_rows": 190,
   "removed_rows": 0
 }

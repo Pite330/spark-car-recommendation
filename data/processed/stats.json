@@ -1,62 +1,54 @@
 {
-  "input_rows": 84,
-  "output_rows": 84,
+  "input_rows": 190,
+  "output_rows": 190,
   "removed_rows": 0,
   "price_wan": {
-    "min": 1.44,
-    "max": 178.41,
-    "average": 22.85
+    "min": 3.49,
+    "max": 364.3,
+    "average": 28.45
+  },
+  "sales": {
+    "latest_period": "2026-06",
+    "max_monthly_sales": 38654
   },
   "energy_distribution": [
     {
-      "energy_type": "纯电",
-      "count": 39
-    },
-    {
       "energy_type": "燃油",
-      "count": 26
+      "count": 58
     },
     {
-      "energy_type": "插混",
-      "count": 9
-    },
-    {
-      "energy_type": "增程",
-      "count": 8
+      "energy_type": "纯电",
+      "count": 57
     },
     {
       "energy_type": "混动",
-      "count": 2
+      "count": 38
+    },
+    {
+      "energy_type": "增程",
+      "count": 20
+    },
+    {
+      "energy_type": "插混",
+      "count": 17
     }
   ],
   "body_distribution": [
     {
       "body_type": "SUV",
-      "count": 54
+      "count": 83
     },
     {
       "body_type": "轿车",
-      "count": 15
+      "count": 63
     },
     {
       "body_type": "两厢车",
-      "count": 7
+      "count": 25
     },
     {
       "body_type": "MPV",
-      "count": 4
-    },
-    {
-      "body_type": "皮卡",
-      "count": 2
-    },
-    {
-      "body_type": "旅行车",
-      "count": 1
-    },
-    {
-      "body_type": "跑车",
-      "count": 1
+      "count": 19
     }
   ]
 }
