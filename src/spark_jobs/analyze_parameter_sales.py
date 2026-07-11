@@ -30,8 +30,8 @@ DEFAULT_INPUT_DIR = Path("data/raw/16888_full/tables")
 DEFAULT_OUTPUT_DIR = Path("data/processed/analysis")
 
 LEAKAGE_PARAMETERS = {"全国4S最低报价", "车款人气"}
-CATEGORICAL_CONTROLS = ["brand", "level_name", "energy_type", "body_structure"]
-NUMERIC_CONTROLS = ["price_median_wan", "model_year_max", "trim_count"]
+CATEGORICAL_CONTROLS = ["brand", "level_name", "body_structure"]
+NUMERIC_CONTROLS = ["price_median_wan", "model_year_max", "trim_count", "energy_type"]
 
 PARAMETER_SCHEMA = T.StructType(
     [
@@ -87,6 +87,22 @@ SALES_SCHEMA = T.StructType(
 def feature_name(kind: str, parameter_key: str) -> str:
     prefix = "num" if kind == "numeric" else "equip"
     return f"{prefix}_{hashlib.sha1(parameter_key.encode('utf-8')).hexdigest()[:12]}"
+
+
+def encode_energy_type(value: object) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    lower = text.lower()
+    if any(token in lower for token in ["纯电", "电动", "电驱", "新能源", "ev", "纯电动"]):
+        return 1.0
+    if any(token in lower for token in ["插混", "混动", "增程", "油电", "hev", "phev", "erev"]):
+        return 0.5
+    if any(token in lower for token in ["燃油", "汽油", "柴油", "油气", "内燃"]):
+        return 0.0
+    return None
 
 
 def classify_parameter(row: dict[str, object]) -> str:
@@ -262,7 +278,10 @@ def build_series_features(parameters: DataFrame, mapping: DataFrame) -> DataFram
 def build_controls(parameters: DataFrame, trims: DataFrame) -> DataFrame:
     brand = mode_by_series(parameters.filter(F.col("parameter_name") == "厂商"), "value_text", "brand")
     level = mode_by_series(parameters.filter(F.col("parameter_name") == "级别"), "value_text", "level_name")
-    energy = mode_by_series(trims, "energy_type_raw", "energy_type")
+    energy = (
+        mode_by_series(trims, "energy_type_raw", "energy_type")
+        .withColumn("energy_type", F.udf(encode_energy_type, T.DoubleType())(F.col("energy_type")))
+    )
     body = mode_by_series(trims, "body_structure", "body_structure")
     price = (
         parameters.filter((F.col("parameter_name") == "厂商指导价(元)") & F.col("value_numeric").isNotNull())
@@ -282,13 +301,102 @@ def build_controls(parameters: DataFrame, trims: DataFrame) -> DataFrame:
     )
 
 
-def build_target(sales: DataFrame) -> tuple[str, DataFrame]:
+def build_target(
+    sales: DataFrame,
+    controls: DataFrame | None = None,
+    *,
+    history_window: int = 10,
+) -> tuple[str, DataFrame]:
+    """以最近 history_window 期的销量/销售额趋势作为监督学习标签。"""
     latest_period = sales.filter(F.col("sales").isNotNull()).agg(F.max("sales_period")).first()[0]
+    power = 0.8
+
+    sales_with_value = sales.filter(F.col("sales").isNotNull() & (F.col("sales") >= 0))
+    if controls is not None:
+        sales_with_value = (
+            sales_with_value.join(
+                controls.select("series_id", "price_median_wan"),
+                "series_id",
+                "left",
+            )
+            .withColumn(
+                "sales_value",
+                F.when(
+                    F.col("price_median_wan").isNotNull(),
+                    F.col("sales") * F.col("price_median_wan"),
+                ).otherwise(F.col("sales")),
+            )
+        )
+    else:
+        sales_with_value = sales_with_value.withColumn("sales_value", F.col("sales"))
+
+    ordered = sales_with_value.withColumn(
+        "sales_period_key",
+        F.regexp_replace(F.col("sales_period"), "[^0-9]", ""),
+    )
+    order_window = Window.partitionBy("series_id").orderBy("sales_period_key", "sales_period")
+    ranked = (
+        ordered.withColumn("period_rank", F.row_number().over(order_window))
+        .withColumn("period_total", F.count("*").over(Window.partitionBy("series_id")))
+    )
+    selected = ranked.withColumn(
+        "history_window",
+        F.least(F.col("period_total"), F.lit(history_window)),
+    ).filter(F.col("period_rank") > F.col("period_total") - F.col("history_window"))
+
+    history_windowed = selected.withColumn(
+        "history_index",
+        F.row_number().over(
+            Window.partitionBy("series_id").orderBy("sales_period_key", "sales_period")
+        ),
+    )
+    latest_value = (
+        history_windowed.withColumn(
+            "latest_history_index",
+            F.max("history_index").over(Window.partitionBy("series_id")),
+        )
+        .withColumn(
+            "latest_sales_value",
+            F.when(
+                F.col("history_index") == F.col("latest_history_index"),
+                F.col("sales_value"),
+            ).otherwise(None),
+        )
+    )
+    aggregated = (
+        latest_value.groupBy("series_id")
+        .agg(
+            F.count("*").alias("history_points"),
+            F.count_distinct("sales_value").alias("distinct_sales_values"),
+            F.sum(F.col("history_index") - 1).alias("sum_x"),
+            F.sum("sales_value").alias("sum_y"),
+            F.sum((F.col("history_index") - 1) * F.col("sales_value")).alias("sum_xy"),
+            F.sum((F.col("history_index") - 1) * (F.col("history_index") - 1)).alias("sum_xx"),
+            F.max("latest_sales_value").alias("latest_sales_value"),
+        )
+    )
     target = (
-        sales.filter((F.col("sales_period") == latest_period) & (F.col("sales") >= 0))
-        .groupBy("series_id")
-        .agg(F.max("sales").alias("target_sales"))
-        .withColumn("target_log_sales", F.log1p(F.col("target_sales").cast("double")))
+        aggregated.filter((F.col("history_points") >= 2) & (F.col("distinct_sales_values") > 1))
+        .withColumn(
+            "slope",
+            F.when(
+                (F.col("history_points") * F.col("sum_xx") - F.col("sum_x") * F.col("sum_x")) != 0,
+                (
+                    F.col("history_points") * F.col("sum_xy") - F.col("sum_x") * F.col("sum_y")
+                ) / (
+                    F.col("history_points") * F.col("sum_xx") - F.col("sum_x") * F.col("sum_x")
+                ),
+            ).otherwise(None),
+        )
+        .withColumn(
+            "target_log_sales",
+            F.when(
+                F.col("slope").isNotNull() & F.col("latest_sales_value").isNotNull(),
+                F.col("slope") * F.pow(F.col("latest_sales_value").cast("double"), F.lit(power)),
+            ).otherwise(None),
+        )
+        .select("series_id", "target_log_sales")
+        .filter(F.col("target_log_sales").isNotNull())
     )
     return latest_period, target
 
@@ -431,6 +539,19 @@ def evaluate_models(analysis: DataFrame, feature_columns: list[str], folds: int)
         }
 
     importance: dict[str, dict[str, float]] = defaultdict(dict)
+    relevant_names = set(feature_columns) | set(CATEGORICAL_CONTROLS) | set(NUMERIC_CONTROLS)
+
+    def normalize_feature_name(name: str) -> str | None:
+        if name in relevant_names:
+            return name
+        for control_name in CATEGORICAL_CONTROLS:
+            if name == control_name or name.startswith(f"{control_name}_"):
+                return control_name
+        for control_name in NUMERIC_CONTROLS:
+            if name == control_name or name.startswith(f"{control_name}_"):
+                return control_name
+        return None
+
     for model_name, factory in [
         ("elastic_net", specs["full_elastic_net"][1]),
         ("random_forest", specs["full_random_forest"][1]),
@@ -452,8 +573,11 @@ def evaluate_models(analysis: DataFrame, feature_columns: list[str], folds: int)
             else estimator_model.featureImportances.toArray().tolist()
         )
         for name, value in zip(names, values):
-            if name in feature_columns:
-                importance[name][model_name] = float(value)
+            target_name = normalize_feature_name(name)
+            if target_name is None:
+                continue
+            if target_name in relevant_names:
+                importance[target_name][model_name] = importance[target_name].get(model_name, 0.0) + float(value)
     return results, importance
 
 
@@ -551,7 +675,12 @@ def consolidated_parameter_results(
     return sorted(results, key=lambda row: (str(row["group_name"]), str(row["parameter_name"])))
 
 
-def univariate_associations(series_features: DataFrame, target: DataFrame) -> list[dict[str, object]]:
+def univariate_associations(
+    series_features: DataFrame,
+    target: DataFrame,
+    controls: DataFrame | None = None,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
     joined = (
         series_features.join(target.select("series_id", "target_log_sales"), "series_id", "inner")
         .select("feature_name", "feature_value", "target_log_sales")
@@ -561,10 +690,39 @@ def univariate_associations(series_features: DataFrame, target: DataFrame) -> li
     for row in joined:
         grouped[row["feature_name"]][0].append(float(row["feature_value"]))
         grouped[row["feature_name"]][1].append(float(row["target_log_sales"]))
-    rows: list[dict[str, object]] = []
     for name, (values, targets) in grouped.items():
         rho, p_value = spearman(values, targets)
         rows.append({"feature_name": name, "n": len(values), "spearman_rho": rho, "p_value": p_value})
+
+    if controls is not None:
+        target_with_controls = target.join(controls, "series_id", "inner")
+        for column in NUMERIC_CONTROLS:
+            values = target_with_controls.select(column, "target_log_sales").collect()
+            if not values:
+                continue
+            numeric_values: list[float] = []
+            target_values: list[float] = []
+            for row in values:
+                candidate = row[column]
+                if candidate is None:
+                    continue
+                try:
+                    numeric = float(candidate)
+                except (TypeError, ValueError):
+                    continue
+                numeric_values.append(numeric)
+                target_values.append(float(row["target_log_sales"]))
+            if len(numeric_values) >= 3 and len(numeric_values) == len(target_values):
+                rho, p_value = spearman(numeric_values, target_values)
+                rows.append(
+                    {
+                        "feature_name": column,
+                        "n": len(numeric_values),
+                        "spearman_rho": rho,
+                        "p_value": p_value,
+                    }
+                )
+
     adjusted = benjamini_hochberg([float(row["p_value"]) for row in rows])
     for row, q_value in zip(rows, adjusted):
         row["fdr_q_value"] = q_value
@@ -606,7 +764,7 @@ def run(
         quality, mapping = parameter_quality(parameters)
         series_features = build_series_features(parameters, mapping).cache()
         controls = build_controls(parameters, trims).cache()
-        latest_period, target = build_target(sales)
+        latest_period, target = build_target(sales, controls)
         selected, quality = select_model_features(
             series_features, target, quality,
             minimum_coverage=minimum_coverage, max_features=max_features,
@@ -614,18 +772,48 @@ def run(
         selected_long = series_features.filter(F.col("feature_name").isin(selected)).cache()
         analysis = build_analysis_dataset(selected_long, controls, target, selected).cache()
 
-        associations = univariate_associations(selected_long, target)
+        associations = univariate_associations(selected_long, target, controls)
         metrics, importance = evaluate_models(analysis, selected, folds)
         quality_by_feature = {str(row["feature_name"]): row for row in quality if row["feature_name"]}
+        control_name_map = {
+            "brand": "品牌",
+            "level_name": "级别",
+            "energy_type": "能源类型",
+            "body_structure": "车身结构",
+            "price_median_wan": "指导价格",
+            "model_year_max": "车型年份上限",
+            "trim_count": "车款数量",
+        }
+        control_quality_rows = [
+            {
+                "feature_name": name,
+                "group_name": "control",
+                "parameter_name": control_name_map.get(name, name),
+                "parameter_type": "control",
+                "selected_for_model": True,
+                "excluded_reason": "control_only",
+            }
+            for name in CATEGORICAL_CONTROLS + NUMERIC_CONTROLS
+        ]
         for association in associations:
-            source = quality_by_feature[str(association["feature_name"])]
-            association.update(
-                {
-                    "group_name": source["group_name"],
-                    "parameter_name": source["parameter_name"],
-                    "parameter_type": source["parameter_type"],
-                }
-            )
+            feature_name = str(association["feature_name"])
+            if feature_name in quality_by_feature:
+                source = quality_by_feature[feature_name]
+                association.update(
+                    {
+                        "group_name": source["group_name"],
+                        "parameter_name": source["parameter_name"],
+                        "parameter_type": source["parameter_type"],
+                    }
+                )
+            elif feature_name in control_name_map:
+                association.update(
+                    {
+                        "group_name": "control",
+                        "parameter_name": control_name_map[feature_name],
+                        "parameter_type": "control",
+                    }
+                )
         importance_rows = []
         for name in selected:
             source = quality_by_feature[name]
@@ -639,8 +827,23 @@ def run(
                     "random_forest_importance": importance.get(name, {}).get("random_forest", 0.0),
                 }
             )
+        for name in CATEGORICAL_CONTROLS + NUMERIC_CONTROLS:
+            importance_rows.append(
+                {
+                    "feature_name": name,
+                    "group_name": "control",
+                    "parameter_name": name,
+                    "parameter_type": "control",
+                    "elastic_net_coefficient": importance.get(name, {}).get("elastic_net", 0.0),
+                    "random_forest_importance": importance.get(name, {}).get("random_forest", 0.0),
+                }
+            )
         importance_rows.sort(key=lambda row: float(row["random_forest_importance"]), reverse=True)
-        consolidated_rows = consolidated_parameter_results(quality, associations, importance_rows)
+        consolidated_rows = consolidated_parameter_results(
+            quality + control_quality_rows,
+            associations,
+            importance_rows,
+        )
 
         output_dir.mkdir(parents=True, exist_ok=True)
         write_parquet(selected_long, output_dir / "series_features.parquet")
