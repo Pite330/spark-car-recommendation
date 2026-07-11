@@ -97,3 +97,34 @@ make test
 - 页面结构变化可能导致字段失效，采集脚本需要随之更新；
 - 公开仓库、扩大采集或商业使用前，应重新核查来源站点条款、版权和数据授权；
 - `.env`、API Key、Cookie、验证码和个人凭据不得写入数据文件或提交 Git。
+
+## 8. 完整配置参数与销量历史
+
+消费者推荐快照只保留少量聚合字段。厂商侧探索性分析使用独立脚本：
+
+```bash
+# 先试采前 20 个车系
+make data-full-pilot
+
+# 确认字段和磁盘空间后，再采集当前分类页发现的全部在售车系
+make data-full
+
+# 只采集指定车系；57232 是奥迪 A6L 车系 ID
+.venv/bin/python scripts/fetch_16888_full_options.py --series-id 57232
+
+# 中途停止采集后，只根据现有缓存重建分析表，不再联网
+.venv/bin/python scripts/fetch_16888_full_options.py --build-only
+```
+
+默认输出目录是 `data/raw/16888_full/`，该目录由 `.gitignore` 排除，不提交大体积原始响应。脚本默认设置 1 秒请求间隔；每个车系的参数 JSON 和销量 HTML 会先写入 `responses/`，中断重跑时复用已有缓存。使用 `--force-refresh` 才会重新请求已经缓存的车系。
+
+规范化结果位于 `tables/`：
+
+- `series.csv`：车系及分类提示；
+- `trims.csv`：每个在售配置款的标识和基础元数据；
+- `parameter_definitions.csv`：参数分组、名称和单位字典；
+- `trim_parameters.csv.gz`：完整“配置款 × 参数”压缩长表；
+- `series_month_sales.csv`：销量页面公开的车系月度历史；
+- `manifest.json`：行数、采集时间、请求间隔和失败清单。
+
+`decade=0` 对应参数页的“全部在售”，因此这份数据不是历史配置档案。月销量是车系级而不是配置款级；分析参数与销量关系前，需要先把同车系配置款聚合为数值范围、标配率或选配率，并将结论表述为关联而不是因果影响。

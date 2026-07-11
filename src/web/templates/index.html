@@ -17,9 +17,15 @@
         <span class="brand-mark">↗</span>
         <span>选车罗盘</span>
       </a>
-      <div class="status-pill" id="system-status">
-        <span class="status-dot"></span>
-        <span>{{ catalog.car_count }} 款车型已就绪</span>
+      <div class="topbar-actions">
+        <nav class="view-nav" aria-label="页面功能导航">
+          <a href="#recommendation-workspace">消费者选车</a>
+          <a href="#manufacturer-insight">厂商洞察</a>
+        </nav>
+        <div class="status-pill" id="system-status">
+          <span class="status-dot"></span>
+          <span>{{ catalog.car_count }} 款车型已就绪</span>
+        </div>
       </div>
     </header>
 
@@ -166,6 +172,77 @@
         <div class="insight-grid">
           <article><div><h3>能源类型分布</h3><p>当前车型库的动力结构</p></div><div id="energy-chart" class="chart"></div></article>
           <article><div><h3>车身类型分布</h3><p>不同用车形态的样本数量</p></div><div id="body-chart" class="chart"></div></article>
+        </div>
+      </section>
+
+      <section class="manufacturer-insight shell" id="manufacturer-insight" aria-labelledby="analysis-title">
+        <div class="analysis-heading">
+          <div>
+            <p class="step-label">PARAMETER INTELLIGENCE / 厂商洞察</p>
+            <h2 id="analysis-title">从全量参数中，识别销量信号。</h2>
+          </div>
+          <div class="analysis-period" aria-label="分析数据期间">
+            <span>销量期间</span>
+            <strong id="analysis-period">加载中</strong>
+          </div>
+        </div>
+        <p class="analysis-lead">结合单参数关联、Elastic Net 与随机森林，查看哪些配置与销量表现稳定相关。结果用于产品决策线索，不代表单一参数对销量的因果作用。</p>
+
+        <div id="analysis-loading" class="analysis-state" role="status" aria-live="polite">
+          <span class="analysis-spinner" aria-hidden="true"></span>
+          <div><strong>正在构建分析工作台</strong><p>读取模型指标与参数重要度…</p></div>
+        </div>
+        <div id="analysis-error" class="analysis-state analysis-state-error is-hidden" role="alert">
+          <div><strong>分析结果暂不可用</strong><p id="analysis-error-message">请稍后重试。</p></div>
+          <button id="analysis-retry" type="button">重新加载</button>
+        </div>
+
+        <div id="analysis-dashboard" class="is-hidden">
+          <div class="analysis-kpis" id="analysis-kpis" aria-label="分析关键指标"></div>
+
+          <div id="analysis-warnings" class="analysis-warnings is-hidden" role="note"></div>
+
+          <div class="analysis-toolbar">
+            <div>
+              <p class="analysis-kicker">参数探索器</p>
+              <h3>关联强度与模型贡献</h3>
+            </div>
+            <label for="analysis-group-filter">参数分组
+              <select id="analysis-group-filter"><option value="">全部分组</option></select>
+            </label>
+          </div>
+
+          <div class="analysis-grid analysis-grid-models">
+            <article class="analysis-panel model-panel">
+              <div class="panel-heading"><div><h3>模型解释力</h3><p>R² 越高，模型对销量差异的解释能力越强</p></div><span class="panel-chip">GROUP CV</span></div>
+              <div id="analysis-model-chart" class="analysis-chart" role="img" aria-label="模型 R 平方对比图"></div>
+            </article>
+            <article class="analysis-panel lift-panel">
+              <div class="panel-heading"><div><h3>配置参数增量</h3><p>相对控制变量基线增加的解释力</p></div><span class="panel-chip accent">Δ R²</span></div>
+              <div id="analysis-lift-cards" class="lift-cards"></div>
+            </article>
+          </div>
+
+          <div class="analysis-grid analysis-grid-charts">
+            <article class="analysis-panel importance-panel">
+              <div class="panel-heading"><div><h3>参数重要度 Top 12</h3><p>随机森林中的相对贡献，按当前分组动态排序</p></div></div>
+              <div id="analysis-importance-chart" class="analysis-chart analysis-chart-tall" role="img" aria-label="参数重要度水平条形图"></div>
+            </article>
+            <article class="analysis-panel direction-panel">
+              <div class="panel-heading"><div><h3>关联方向</h3><p>横轴为 Spearman ρ，点大小表示随机森林重要度</p></div><div class="direction-legend"><span class="positive">正相关</span><span class="negative">负相关</span></div></div>
+              <div id="analysis-direction-chart" class="analysis-chart analysis-chart-tall" role="img" aria-label="参数销量关联方向散点图"></div>
+            </article>
+          </div>
+
+          <article class="analysis-panel analysis-table-panel">
+            <div class="panel-heading"><div><h3>全量参数证据明细</h3><p id="analysis-table-caption">187 项来源参数，按随机森林重要度排序</p></div><span class="panel-chip" id="analysis-result-count">0 项</span></div>
+            <div class="analysis-table-wrap">
+              <table class="analysis-table">
+                <thead><tr><th scope="col">参数</th><th scope="col">分组 / 类型</th><th scope="col">Spearman ρ</th><th scope="col">FDR q</th><th scope="col">Elastic Net</th><th scope="col">RF 重要度</th><th scope="col">判断</th></tr></thead>
+                <tbody id="analysis-table-body"></tbody>
+              </table>
+            </div>
+          </article>
         </div>
       </section>
     </main>

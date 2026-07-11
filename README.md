@@ -1,6 +1,6 @@
 # Spark 汽车购车推荐平台
 
-一个已跑通的消费者购车推荐 MVP：PySpark 离线清洗公开车型快照，确定性算法按预算和偏好筛选评分，Flask 返回 3—5 款可解释推荐，页面支持车型对比和 ECharts 数据统计。大模型只负责可选文字润色，关闭后主链路不受影响。
+一个已跑通的消费者购车推荐和厂商参数洞察平台：PySpark 离线清洗公开车型快照，确定性算法按预算和偏好筛选评分；完整参数管道进一步使用 Spearman、Elastic Net 和随机森林分析配置与同月销量的关联。大模型只负责可选文字润色，关闭后主链路不受影响。
 
 ## 已完成功能
 
@@ -12,7 +12,11 @@
 - 2—3 款车型参数表和雷达图对比；
 - Spark 车型库能源/车身分布图；
 - OpenAI 兼容说明接口、超时处理和模板化降级；
-- 健康检查、推荐、对比接口及 14 项自动化测试。
+- 健康检查、推荐和对比接口；
+- 1620 个车系、19482 个配置款和 364 万条完整配置参数长表；
+- 187 项参数质量、关联方向、Elastic Net 系数和随机森林重要度；
+- 厂商洞察工作台、全量参数筛选、模型解释力与趋势数据可用性提示；
+- 分析概览接口以及共 26 项自动化测试。
 
 ## 一键运行
 
@@ -21,6 +25,7 @@
 ```bash
 make setup
 make spark
+make analyze
 make pdf
 make test
 make run
@@ -89,7 +94,7 @@ data/processed/           Spark 可重建结果与统计证据
 scripts/                  原始快照更新脚本
 src/spark_jobs/           PySpark 清洗与统计
 src/recommender/          校验、筛选、评分、放宽和模板原因
-src/web/                  Flask、页面、ECharts 和 LLM 适配
+src/web/                  Flask、推荐页面、厂商洞察、ECharts 和 LLM 适配
 tests/                    算法、接口、降级和产物测试
 docs/                     MVP、契约、设计和验收记录
 ```
@@ -101,6 +106,8 @@ docs/                     MVP、契约、设计和验收记录
 - [数据字典](docs/data-dictionary.md)
 - [16888 数据采集说明](docs/data-acquisition-16888.md)
 - [推荐算法](docs/recommendation-design.md)
+- [参数销量分析设计](docs/parameter-sales-analysis.md)
+- [参数销量分析结果](docs/parameter-sales-results.md)
 - [验收记录](docs/acceptance-report.md)
 - [课程交付材料填写指南](docs/deliverables-fill-guide.md)
 
