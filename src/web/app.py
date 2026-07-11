@@ -10,22 +10,31 @@ import requests
 
 from src.recommender import RecommendationEngine, RecommendationError
 from src.recommender.loader import load_cars
+from src.web.analysis_loader import load_analysis_overview
 from src.web.llm import LLMReasonWriter
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATASET = PROJECT_ROOT / "data/processed/cars.csv"
+DEFAULT_ANALYSIS_DIR = PROJECT_ROOT / "data/processed/analysis"
 
 
-def create_app(config: dict[str, object] | None = None) -> Flask:
+def create_app(
+    config: dict[str, object] | None = None,
+    *,
+    analysis_dir: str | Path | None = None,
+) -> Flask:
     load_dotenv(PROJECT_ROOT / ".env")
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.from_mapping(
         DATASET_PATH=os.getenv("CAR_DATASET_PATH", str(DEFAULT_DATASET)),
+        ANALYSIS_DIR=os.getenv("CAR_ANALYSIS_DIR", str(DEFAULT_ANALYSIS_DIR)),
         JSON_AS_ASCII=False,
     )
     if config:
         app.config.update(config)
+    if analysis_dir is not None:
+        app.config["ANALYSIS_DIR"] = str(analysis_dir)
 
     engine: RecommendationEngine | None = None
     dataset_error: str | None = None
@@ -80,6 +89,23 @@ def create_app(config: dict[str, object] | None = None) -> Flask:
                 "llm_provider": llm.provider,
                 "llm_model": llm.model,
             }
+        )
+
+    @app.get("/api/analysis/overview")
+    def analysis_overview():
+        raw_limit = request.args.get("limit", "187")
+        try:
+            limit = int(raw_limit)
+        except (TypeError, ValueError):
+            raise RecommendationError(
+                "INVALID_LIMIT", "limit 必须是 1 到 500 之间的整数", field="limit"
+            )
+        if not 1 <= limit <= 500:
+            raise RecommendationError(
+                "INVALID_LIMIT", "limit 必须是 1 到 500 之间的整数", field="limit"
+            )
+        return jsonify(
+            load_analysis_overview(Path(str(app.config["ANALYSIS_DIR"])), limit=limit)
         )
 
     @app.post("/api/recommend")

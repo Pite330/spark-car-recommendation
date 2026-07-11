@@ -202,3 +202,229 @@ function renderCatalogCharts() {
 }
 
 renderCatalogCharts();
+
+const analysisUi = {
+  loading: document.querySelector('#analysis-loading'),
+  error: document.querySelector('#analysis-error'),
+  errorMessage: document.querySelector('#analysis-error-message'),
+  dashboard: document.querySelector('#analysis-dashboard'),
+  period: document.querySelector('#analysis-period'),
+  kpis: document.querySelector('#analysis-kpis'),
+  warnings: document.querySelector('#analysis-warnings'),
+  filter: document.querySelector('#analysis-group-filter'),
+  tableBody: document.querySelector('#analysis-table-body'),
+  resultCount: document.querySelector('#analysis-result-count'),
+  tableCaption: document.querySelector('#analysis-table-caption'),
+  liftCards: document.querySelector('#analysis-lift-cards')
+};
+let analysisData = null;
+let analysisModelChart = null;
+let analysisImportanceChart = null;
+let analysisDirectionChart = null;
+
+function finiteNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function formatDecimal(value, digits = 3) {
+  if (value === null || value === undefined || value === '') return '—';
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toFixed(digits) : '—';
+}
+
+function parameterLabel(parameter) {
+  return parameter.parameter_name || parameter.feature_name || '未命名参数';
+}
+
+function analysisRows(group = '') {
+  const rows = Array.isArray(analysisData?.top_parameters) ? analysisData.top_parameters : [];
+  return group ? rows.filter((row) => (row.group_name || '其他') === group) : rows;
+}
+
+function renderAnalysisKpis(data) {
+  const items = [
+    ['分析样本', data.analysis_rows, '同期车系销量记录'],
+    ['原始参数', data.parameter_definitions, '进入 Adapter 前'],
+    ['标准特征', data.adapter_features, '完成统一编码'],
+    ['模型特征', data.model_features, '进入训练与验证'],
+    ['显著信号', data.significant_features, 'FDR 校正后']
+  ];
+  analysisUi.kpis.innerHTML = items.map(([label, value, note]) => `
+    <article class="analysis-kpi"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value ?? '—')}</strong><small>${escapeHtml(note)}</small></article>
+  `).join('');
+}
+
+function renderAnalysisModel(data) {
+  if (!window.echarts) return;
+  const metrics = Array.isArray(data.metrics) ? data.metrics : [];
+  analysisModelChart?.dispose();
+  analysisModelChart = echarts.init(document.querySelector('#analysis-model-chart'));
+  analysisModelChart.setOption({
+    color: ['#2d7b5d'],
+    grid: {left: 118, right: 34, top: 28, bottom: 38},
+    tooltip: {
+      trigger: 'axis', axisPointer: {type: 'shadow'},
+      formatter: (items) => {
+        const index = items[0]?.dataIndex ?? 0;
+        const metric = metrics[index] || {};
+        return `<strong>${escapeHtml(metric.label || metric.key || '模型')}</strong><br>R² ${formatDecimal(metric.r2)}<br>RMSE ${formatDecimal(metric.rmse)} · MAE ${formatDecimal(metric.mae)}`;
+      }
+    },
+    xAxis: {type: 'value', min: 0, axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
+    yAxis: {
+      type: 'category', inverse: true, data: metrics.map((item) => item.label || item.key),
+      axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#4e5c54', width: 105, overflow: 'truncate'}
+    },
+    series: [{
+      type: 'bar', barMaxWidth: 18, data: metrics.map((item, index) => ({
+        value: finiteNumber(item.r2),
+        itemStyle: {color: index === 0 ? '#9ba9a1' : index === metrics.length - 1 ? '#ff7a3d' : '#2d7b5d', borderRadius: [0, 7, 7, 0]}
+      })),
+      label: {show: true, position: 'right', color: '#33453b', formatter: ({value}) => finiteNumber(value).toFixed(3)}
+    }]
+  });
+}
+
+function renderAnalysisLift(data) {
+  const values = [
+    ['Elastic Net', data.incremental_r2?.elastic_net],
+    ['随机森林', data.incremental_r2?.random_forest]
+  ];
+  const maximum = Math.max(...values.map(([, value]) => Math.abs(finiteNumber(value))), .001);
+  analysisUi.liftCards.innerHTML = values.map(([label, value]) => {
+    const number = finiteNumber(value);
+    const width = Math.max(3, Math.abs(number) / maximum * 100);
+    return `<div class="lift-card"><div><span>${escapeHtml(label)}</span><strong>${number >= 0 ? '+' : ''}${formatDecimal(number)}</strong></div><div class="lift-bar" aria-hidden="true"><i style="width:${width.toFixed(1)}%"></i></div></div>`;
+  }).join('');
+}
+
+function signalFor(parameter) {
+  const strengthLabels = {strong: '强证据', moderate: '中等证据', weak: '弱证据', not_evaluated: '未评估'};
+  const directionLabels = {positive: '正向', negative: '负向', mixed: '方向混合', neutral: '中性', not_evaluated: ''};
+  if (parameter.evidence_strength) {
+    const strength = strengthLabels[parameter.evidence_strength] || parameter.evidence_strength;
+    const direction = directionLabels[parameter.association_direction] || '';
+    const className = parameter.association_direction === 'positive' ? 'positive'
+      : parameter.association_direction === 'negative' ? 'negative'
+      : parameter.association_direction === 'mixed' ? 'mixed' : 'neutral';
+    return {label: [strength, direction].filter(Boolean).join(' · '), className};
+  }
+  const rho = finiteNumber(parameter.spearman_rho);
+  const significant = Number(parameter.fdr_q_value) <= .05;
+  if (!significant || Math.abs(rho) < .05) return {label: '信号较弱', className: 'neutral'};
+  return rho > 0 ? {label: '正向信号', className: 'positive'} : {label: '负向信号', className: 'negative'};
+}
+
+function renderParameterCharts(rows) {
+  if (!window.echarts) return;
+  const important = [...rows]
+    .sort((a, b) => finiteNumber(b.random_forest_importance) - finiteNumber(a.random_forest_importance))
+    .slice(0, 12).reverse();
+  analysisImportanceChart?.dispose();
+  analysisImportanceChart = echarts.init(document.querySelector('#analysis-importance-chart'));
+  analysisImportanceChart.setOption({
+    grid: {left: 132, right: 34, top: 25, bottom: 30},
+    tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}, valueFormatter: (value) => formatDecimal(value, 4)},
+    xAxis: {type: 'value', axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
+    yAxis: {type: 'category', data: important.map(parameterLabel), axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 120, overflow: 'truncate'}},
+    series: [{type: 'bar', barMaxWidth: 15, data: important.map((row) => finiteNumber(row.random_forest_importance)), itemStyle: {color: '#2d7b5d', borderRadius: [0, 6, 6, 0]}}]
+  });
+
+  const directionRows = [...rows]
+    .sort((a, b) => Math.abs(finiteNumber(b.spearman_rho)) - Math.abs(finiteNumber(a.spearman_rho)))
+    .slice(0, 18);
+  const maxImportance = Math.max(...directionRows.map((row) => finiteNumber(row.random_forest_importance)), .001);
+  analysisDirectionChart?.dispose();
+  analysisDirectionChart = echarts.init(document.querySelector('#analysis-direction-chart'));
+  analysisDirectionChart.setOption({
+    grid: {left: 136, right: 28, top: 25, bottom: 35},
+    tooltip: {formatter: ({data}) => `<strong>${escapeHtml(data.name)}</strong><br>Spearman ρ ${formatDecimal(data.value[0])}<br>RF 重要度 ${formatDecimal(data.importance, 4)}`},
+    xAxis: {type: 'value', min: -1, max: 1, axisLine: {lineStyle: {color: '#aab4ae'}}, axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
+    yAxis: {type: 'category', inverse: true, data: directionRows.map(parameterLabel), axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 124, overflow: 'truncate'}},
+    series: [{type: 'scatter', data: directionRows.map((row, index) => {
+      const rho = finiteNumber(row.spearman_rho);
+      const importance = finiteNumber(row.random_forest_importance);
+      return {name: parameterLabel(row), value: [rho, index], importance, symbolSize: 8 + 18 * Math.sqrt(importance / maxImportance), itemStyle: {color: rho >= 0 ? '#2d7b5d' : '#ff7a3d', opacity: .82}};
+    }), emphasis: {scale: 1.25}}]
+  });
+}
+
+function renderParameterTable(rows, group) {
+  const sortedRows = [...rows].sort((a, b) => finiteNumber(b.random_forest_importance) - finiteNumber(a.random_forest_importance));
+  analysisUi.resultCount.textContent = `${sortedRows.length} 项`;
+  analysisUi.tableCaption.textContent = group ? `${group} · 按随机森林重要度排序` : '全部分组 · 按随机森林重要度排序';
+  if (!sortedRows.length) {
+    analysisUi.tableBody.innerHTML = '<tr><td class="analysis-empty" colspan="7">当前分组暂无可展示参数</td></tr>';
+    return;
+  }
+  analysisUi.tableBody.innerHTML = sortedRows.map((row) => {
+    const rho = row.spearman_rho === null || row.spearman_rho === '' ? null : finiteNumber(row.spearman_rho);
+    const coefficient = row.elastic_net_coefficient === null || row.elastic_net_coefficient === '' ? null : finiteNumber(row.elastic_net_coefficient);
+    const signal = signalFor(row);
+    return `<tr>
+      <td>${escapeHtml(parameterLabel(row))}</td>
+      <td>${escapeHtml(row.group_name || '其他')} / ${escapeHtml(row.parameter_type || '—')}</td>
+      <td class="${rho > 0 ? 'metric-positive' : rho < 0 ? 'metric-negative' : ''}">${rho > 0 ? '+' : ''}${formatDecimal(rho)}</td>
+      <td>${formatDecimal(row.fdr_q_value, 4)}</td>
+      <td class="${coefficient > 0 ? 'metric-positive' : coefficient < 0 ? 'metric-negative' : ''}">${coefficient > 0 ? '+' : ''}${formatDecimal(coefficient, 4)}</td>
+      <td>${formatDecimal(row.random_forest_importance, 4)}</td>
+      <td><span class="signal-stack"><span class="signal-badge ${signal.className}">${signal.label}</span><span class="trend-badge" title="${escapeHtml(analysisData?.trend_status_reason || '')}">${row.trend_status === 'insufficient_history' ? '趋势数据不足' : escapeHtml(row.trend_status || '趋势待评估')}</span></span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderFilteredAnalysis() {
+  const group = analysisUi.filter.value;
+  const rows = analysisRows(group);
+  renderParameterCharts(rows);
+  renderParameterTable(rows, group);
+}
+
+function renderAnalysis(data) {
+  analysisUi.period.textContent = data.sales_period || '未标注';
+  renderAnalysisKpis(data);
+  renderAnalysisModel(data);
+  renderAnalysisLift(data);
+
+  const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
+  analysisUi.warnings.classList.toggle('is-hidden', warnings.length === 0);
+  analysisUi.warnings.textContent = warnings.length ? `分析提示：${warnings.join('；')}` : '';
+
+  const groups = [...new Set(analysisRows().map((row) => row.group_name || '其他'))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  analysisUi.filter.innerHTML = '<option value="">全部分组</option>' + groups.map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`).join('');
+  renderFilteredAnalysis();
+}
+
+async function loadAnalysis() {
+  analysisUi.loading.classList.remove('is-hidden');
+  analysisUi.error.classList.add('is-hidden');
+  analysisUi.dashboard.classList.add('is-hidden');
+  try {
+    const response = await fetch('/api/analysis/overview?limit=187', {headers: {'Accept': 'application/json'}});
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error?.message || '分析接口请求失败');
+    if (!body.available) throw new Error((body.warnings || []).join('；') || '尚未生成参数销量分析结果');
+    analysisData = body;
+    // ECharts 初始化时需要可见容器，否则会读取到 0 宽高。
+    analysisUi.dashboard.classList.remove('is-hidden');
+    renderAnalysis(body);
+  } catch (error) {
+    analysisUi.dashboard.classList.add('is-hidden');
+    analysisUi.period.textContent = '不可用';
+    analysisUi.errorMessage.textContent = error.message;
+    analysisUi.error.classList.remove('is-hidden');
+  } finally {
+    analysisUi.loading.classList.add('is-hidden');
+  }
+}
+
+analysisUi.filter?.addEventListener('change', renderFilteredAnalysis);
+document.querySelector('#analysis-retry')?.addEventListener('click', loadAnalysis);
+window.addEventListener('resize', () => {
+  analysisModelChart?.resize();
+  analysisImportanceChart?.resize();
+  analysisDirectionChart?.resize();
+});
+
+loadAnalysis();
