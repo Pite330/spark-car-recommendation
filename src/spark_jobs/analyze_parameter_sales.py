@@ -24,10 +24,23 @@ from pyspark.ml.regression import LinearRegression, RandomForestRegressor
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
+from pyspark import StorageLevel
 
 
 DEFAULT_INPUT_DIR = Path("data/raw/16888_full/tables")
 DEFAULT_OUTPUT_DIR = Path("data/processed/analysis")
+
+SPARK_LOCAL_CORES = int(os.getenv("SPARK_LOCAL_CORES", "2"))
+SPARK_DRIVER_MEMORY = os.getenv("SPARK_DRIVER_MEMORY", "2g")
+SPARK_EXECUTOR_MEMORY = os.getenv("SPARK_EXECUTOR_MEMORY", "2g")
+SPARK_DRIVER_MAX_RESULT_SIZE = os.getenv("SPARK_DRIVER_MAX_RESULT_SIZE", "1g")
+SPARK_SHUFFLE_PARTITIONS = int(os.getenv("SPARK_SHUFFLE_PARTITIONS", "4"))
+SPARK_DEFAULT_PARALLELISM = int(os.getenv("SPARK_DEFAULT_PARALLELISM", "4"))
+SPARK_MEMORY_FRACTION = os.getenv("SPARK_MEMORY_FRACTION", "0.6")
+SPARK_MEMORY_STORAGE_FRACTION = os.getenv("SPARK_MEMORY_STORAGE_FRACTION", "0.3")
+RF_NUM_TREES = int(os.getenv("RF_NUM_TREES", "70"))
+RF_MAX_DEPTH = int(os.getenv("RF_MAX_DEPTH", "13"))
+RF_MIN_INSTANCES_PER_NODE = int(os.getenv("RF_MIN_INSTANCES_PER_NODE", "2"))
 
 LEAKAGE_PARAMETERS = {"全国4S最低报价", "车款人气"}
 CATEGORICAL_CONTROLS = ["brand", "level_name", "body_structure"]
@@ -179,6 +192,11 @@ def write_csv(path: Path, rows: Iterable[dict[str, object]], fieldnames: list[st
     temporary.replace(path)
 
 
+def write_json(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def mode_by_series(frame: DataFrame, value_column: str, alias: str) -> DataFrame:
     valid = frame.filter(F.col(value_column).isNotNull() & (F.trim(F.col(value_column)) != ""))
     counts = valid.groupBy("series_id", value_column).count()
@@ -309,7 +327,7 @@ def build_target(
 ) -> tuple[str, DataFrame]:
     """以最近 history_window 期的销量/销售额趋势作为监督学习标签。"""
     latest_period = sales.filter(F.col("sales").isNotNull()).agg(F.max("sales_period")).first()[0]
-    power = 0.8
+    power = 0.5
 
     sales_with_value = sales.filter(F.col("sales").isNotNull() & (F.col("sales") >= 0))
     if controls is not None:
@@ -504,8 +522,9 @@ def evaluate_models(analysis: DataFrame, feature_columns: list[str], folds: int)
         "full_random_forest": (
             feature_columns,
             lambda: RandomForestRegressor(
-                labelCol="target_log_sales", predictionCol="prediction", numTrees=80,
-                maxDepth=6, minInstancesPerNode=5, seed=20260711,
+                labelCol="target_log_sales", predictionCol="prediction",
+                numTrees=RF_NUM_TREES, maxDepth=RF_MAX_DEPTH,
+                minInstancesPerNode=RF_MIN_INSTANCES_PER_NODE, seed=19191,
             ),
         ),
     }
@@ -526,17 +545,36 @@ def evaluate_models(analysis: DataFrame, feature_columns: list[str], folds: int)
             model = pipeline_for(
                 columns, factory(), scale_features=model_name.endswith("elastic_net")
             ).fit(train)
-            predictions = model.transform(test)
-            fold_results.append(
-                {"fold": fold, **{name: evaluator.evaluate(predictions) for name, evaluator in evaluators.items()}}
-            )
-        results[model_name] = {
+            train_predictions = model.transform(train)
+            test_predictions = model.transform(test)
+            fold_result: dict[str, object] = {"fold": fold}
+            for metric_name in ["rmse", "mae", "r2"]:
+                evaluator = evaluators[metric_name]
+                fold_result[f"train_{metric_name}"] = round(float(evaluator.evaluate(train_predictions)), 6)
+                fold_result[f"test_{metric_name}"] = round(float(evaluator.evaluate(test_predictions)), 6)
+            fold_results.append(fold_result)
+        summary: dict[str, object] = {
             "folds": fold_results,
             "mean": {
-                metric: round(mean(row[metric] for row in fold_results), 6)
-                for metric in evaluators
+                "train_rmse": round(mean(row["train_rmse"] for row in fold_results), 6),
+                "train_mae": round(mean(row["train_mae"] for row in fold_results), 6),
+                "train_r2": round(mean(row["train_r2"] for row in fold_results), 6),
+                "test_rmse": round(mean(row["test_rmse"] for row in fold_results), 6),
+                "test_mae": round(mean(row["test_mae"] for row in fold_results), 6),
+                "test_r2": round(mean(row["test_r2"] for row in fold_results), 6),
+                "rmse": round(mean(row["test_rmse"] for row in fold_results), 6),
+                "mae": round(mean(row["test_mae"] for row in fold_results), 6),
+                "r2": round(mean(row["test_r2"] for row in fold_results), 6),
             },
         }
+        if model_name == "full_random_forest":
+            fitted_for_params = pipeline_for(columns, factory(), scale_features=False).fit(analysis)
+            estimator_model = fitted_for_params.stages[-1]
+            summary["hyperparameters"] = {
+                "labelCol": "target_log_sales",
+                "predictionCol": "prediction",
+            }
+        results[model_name] = summary
 
     importance: dict[str, dict[str, float]] = defaultdict(dict)
     relevant_names = set(feature_columns) | set(CATEGORICAL_CONTROLS) | set(NUMERIC_CONTROLS)
@@ -748,32 +786,71 @@ def run(
     if missing:
         raise FileNotFoundError(f"缺少完整参数分析输入：{', '.join(missing)}")
     spark = (
-        SparkSession.builder.master("local[4]")
+        SparkSession.builder.master(f"local[{SPARK_LOCAL_CORES}]")
         .appName("spark-car-parameter-sales-analysis")
+        .config("spark.driver.memory", SPARK_DRIVER_MEMORY)
+        .config("spark.executor.memory", SPARK_EXECUTOR_MEMORY)
+        .config("spark.driver.maxResultSize", SPARK_DRIVER_MAX_RESULT_SIZE)
+        .config("spark.default.parallelism", str(SPARK_DEFAULT_PARALLELISM))
+        .config("spark.sql.shuffle.partitions", str(SPARK_SHUFFLE_PARTITIONS))
+        .config("spark.memory.fraction", SPARK_MEMORY_FRACTION)
+        .config("spark.memory.storageFraction", SPARK_MEMORY_STORAGE_FRACTION)
         .config("spark.sql.session.timeZone", "Asia/Shanghai")
         .config("spark.ui.enabled", "false")
-        .config("spark.sql.shuffle.partitions", "16")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
     try:
-        parameters = spark.read.option("header", True).schema(PARAMETER_SCHEMA).csv(str(input_dir / "trim_parameters.csv.gz")).cache()
-        trims = spark.read.option("header", True).schema(TRIM_SCHEMA).csv(str(input_dir / "trims.csv")).cache()
-        sales = spark.read.option("header", True).schema(SALES_SCHEMA).csv(str(input_dir / "series_month_sales.csv")).cache()
+        parameters = (
+            spark.read.option("header", True).schema(PARAMETER_SCHEMA).csv(str(input_dir / "trim_parameters.csv.gz"))
+            .persist(StorageLevel.MEMORY_AND_DISK)
+        )
+        trims = (
+            spark.read.option("header", True).schema(TRIM_SCHEMA).csv(str(input_dir / "trims.csv"))
+            .persist(StorageLevel.MEMORY_AND_DISK)
+        )
+        sales = (
+            spark.read.option("header", True).schema(SALES_SCHEMA).csv(str(input_dir / "series_month_sales.csv"))
+            .persist(StorageLevel.MEMORY_AND_DISK)
+        )
 
         quality, mapping = parameter_quality(parameters)
-        series_features = build_series_features(parameters, mapping).cache()
-        controls = build_controls(parameters, trims).cache()
+        series_features = build_series_features(parameters, mapping).persist(StorageLevel.MEMORY_AND_DISK)
+        controls = build_controls(parameters, trims).persist(StorageLevel.MEMORY_AND_DISK)
         latest_period, target = build_target(sales, controls)
         selected, quality = select_model_features(
             series_features, target, quality,
             minimum_coverage=minimum_coverage, max_features=max_features,
         )
-        selected_long = series_features.filter(F.col("feature_name").isin(selected)).cache()
-        analysis = build_analysis_dataset(selected_long, controls, target, selected).cache()
+        selected_long = series_features.filter(F.col("feature_name").isin(selected)).persist(StorageLevel.MEMORY_AND_DISK)
+        analysis = build_analysis_dataset(selected_long, controls, target, selected).persist(StorageLevel.MEMORY_AND_DISK)
 
         associations = univariate_associations(selected_long, target, controls)
         metrics, importance = evaluate_models(analysis, selected, folds)
+        random_forest_diagnostics = {
+            "model_type": "RandomForestRegressor",
+            "hyperparameters": metrics.get("full_random_forest", {}).get("hyperparameters", {}),
+            "fold_metrics": metrics.get("full_random_forest", {}).get("folds", []),
+            "mean_metrics": metrics.get("full_random_forest", {}).get("mean", {}),
+            "notes": "每个 fold 都先用训练集拟合，再用测试集评估，并同时保存训练集与测试集的 RMSE/MAE/R²。",
+        }
+        write_json(output_dir / "random_forest_model_diagnostics.json", random_forest_diagnostics)
+        write_csv(
+            output_dir / "random_forest_model_diagnostics.csv",
+            [
+                {
+                    "fold": row.get("fold"),
+                    "train_rmse": row.get("train_rmse"),
+                    "test_rmse": row.get("test_rmse"),
+                    "train_mae": row.get("train_mae"),
+                    "test_mae": row.get("test_mae"),
+                    "train_r2": row.get("train_r2"),
+                    "test_r2": row.get("test_r2"),
+                }
+                for row in metrics.get("full_random_forest", {}).get("folds", [])
+            ],
+            ["fold", "train_rmse", "test_rmse", "train_mae", "test_mae", "train_r2", "test_r2"],
+        )
         quality_by_feature = {str(row["feature_name"]): row for row in quality if row["feature_name"]}
         control_name_map = {
             "brand": "品牌",
@@ -888,6 +965,7 @@ def run(
             "brand_grouped_folds": folds,
             "excluded_leakage_parameters": sorted(LEAKAGE_PARAMETERS),
             "model_metrics": metrics,
+            "random_forest_diagnostics": random_forest_diagnostics,
             "incremental_mean_r2": {
                 "elastic_net": round(
                     metrics["full_elastic_net"]["mean"]["r2"]
@@ -916,6 +994,9 @@ def run(
         )
         return summary
     finally:
+        for frame in [parameters, trims, sales, series_features, controls, selected_long, analysis]:
+            if frame is not None:
+                frame.unpersist()
         spark.stop()
 
 
