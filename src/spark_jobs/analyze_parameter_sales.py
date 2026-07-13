@@ -39,7 +39,7 @@ SPARK_DEFAULT_PARALLELISM = int(os.getenv("SPARK_DEFAULT_PARALLELISM", "4"))
 SPARK_MEMORY_FRACTION = os.getenv("SPARK_MEMORY_FRACTION", "0.6")
 SPARK_MEMORY_STORAGE_FRACTION = os.getenv("SPARK_MEMORY_STORAGE_FRACTION", "0.3")
 RF_NUM_TREES = int(os.getenv("RF_NUM_TREES", "70"))
-RF_MAX_DEPTH = int(os.getenv("RF_MAX_DEPTH", "13"))
+RF_MAX_DEPTH = int(os.getenv("RF_MAX_DEPTH", "10"))
 RF_MIN_INSTANCES_PER_NODE = int(os.getenv("RF_MIN_INSTANCES_PER_NODE", "2"))
 
 LEAKAGE_PARAMETERS = {"全国4S最低报价", "车款人气"}
@@ -381,41 +381,35 @@ def build_target(
             ).otherwise(None),
         )
     )
+    
     aggregated = (
         latest_value.groupBy("series_id")
         .agg(
             F.count("*").alias("history_points"),
             F.count_distinct("sales_value").alias("distinct_sales_values"),
-            F.sum(F.col("history_index") - 1).alias("sum_x"),
             F.sum("sales_value").alias("sum_y"),
-            F.sum((F.col("history_index") - 1) * F.col("sales_value")).alias("sum_xy"),
-            F.sum((F.col("history_index") - 1) * (F.col("history_index") - 1)).alias("sum_xx"),
             F.max("latest_sales_value").alias("latest_sales_value"),
         )
     )
+    # sales.write.option("delimiter", "\t").option("header", True).csv("test/sales")
+    # latest_value.write.option("delimiter", "\t").option("header", True).csv("test/lastest")
+    # aggregated.write.option("delimiter", "\t").option("header", True).csv("test/aggre")
     target = (
         aggregated.filter((F.col("history_points") >= 2) & (F.col("distinct_sales_values") > 1))
         .withColumn(
-            "slope",
-            F.when(
-                (F.col("history_points") * F.col("sum_xx") - F.col("sum_x") * F.col("sum_x")) != 0,
-                (
-                    F.col("history_points") * F.col("sum_xy") - F.col("sum_x") * F.col("sum_y")
-                ) / (
-                    F.col("history_points") * F.col("sum_xx") - F.col("sum_x") * F.col("sum_x")
-                ),
-            ).otherwise(None),
-        )
-        .withColumn(
             "target_log_sales",
             F.when(
-                F.col("slope").isNotNull() & F.col("latest_sales_value").isNotNull(),
-                F.col("slope") * F.pow(F.col("latest_sales_value").cast("double"), F.lit(power)),
+                (F.col("history_points") != 0),
+                (
+                    F.col("sum_y")
+                ) / (
+                    F.col("history_points")
+                ),
             ).otherwise(None),
         )
         .select("series_id", "target_log_sales")
         .filter(F.col("target_log_sales").isNotNull())
-    )
+        )
     return latest_period, target
 
 
@@ -813,7 +807,6 @@ def run(
             spark.read.option("header", True).schema(SALES_SCHEMA).csv(str(input_dir / "series_month_sales.csv"))
             .persist(StorageLevel.MEMORY_AND_DISK)
         )
-
         quality, mapping = parameter_quality(parameters)
         series_features = build_series_features(parameters, mapping).persist(StorageLevel.MEMORY_AND_DISK)
         controls = build_controls(parameters, trims).persist(StorageLevel.MEMORY_AND_DISK)
@@ -858,7 +851,7 @@ def run(
             "energy_type": "能源类型",
             "body_structure": "车身结构",
             "price_median_wan": "指导价格",
-            "model_year_max": "车型年份上限",
+            "model_year_max": "车型年份",
             "trim_count": "车款数量",
         }
         control_quality_rows = [
