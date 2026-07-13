@@ -332,6 +332,7 @@ function renderParameterCharts(rows) {
     return value === null || value === undefined || value === '' ? null : finiteNumber(value);
   });
   const maximumCoefficient = Math.max(...coefficientValues.map((value) => Math.abs(value ?? 0)), .001);
+  const coefficientExtent = maximumCoefficient * 1.22;
   const zeroCoefficientPoints = coefficientValues.flatMap((value, rowIndex) => (
     value === 0 ? [{value: [0, rowIndex], rowIndex}] : []
   ));
@@ -357,9 +358,10 @@ function renderParameterCharts(rows) {
         splitLine: {lineStyle: {color: '#e2e5df'}}
       },
       {
-        type: 'value', gridIndex: 1, min: -maximumCoefficient, max: maximumCoefficient,
+        type: 'value', gridIndex: 1, min: -coefficientExtent, max: coefficientExtent,
         axisLine: {show: true, lineStyle: {color: '#aab4ae'}},
-        axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}
+        axisLabel: {color: '#7d8881', formatter: (value) => formatDecimal(value, 2)},
+        splitLine: {lineStyle: {color: '#e2e5df'}}
       }
     ],
     yAxis: [
@@ -385,6 +387,15 @@ function renderParameterCharts(rows) {
           if (value === null) return null;
           return {
             value,
+            label: value === 0 ? {show: false} : {
+              show: true,
+              formatter: formatDecimal(value, 3),
+              position: value > 0 ? 'right' : 'left',
+              distance: 5,
+              color: '#65716a',
+              fontSize: 10,
+              fontWeight: 700
+            },
             itemStyle: {
               color: value >= 0 ? '#2d7b5d' : '#ff7a3d',
               borderRadius: value >= 0 ? [0, 6, 6, 0] : [6, 0, 0, 6]
