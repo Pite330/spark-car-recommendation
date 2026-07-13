@@ -7,13 +7,6 @@ from pathlib import Path
 from typing import Any
 
 
-ANALYSIS_FILES = (
-    "model_metrics.json",
-    "univariate_associations.csv",
-    "parameter_importance.csv",
-    "parameter_quality.csv",
-)
-
 METRIC_LABELS = {
     "baseline_elastic_net": "控制变量基线",
     "full_elastic_net": "Elastic Net（含配置参数）",
