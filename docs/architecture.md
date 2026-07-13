@@ -53,7 +53,7 @@ flowchart LR
 
 ## 4. 数据流
 
-1. `scripts/fetch_16888_dataset.py` 低频读取有限范围的公开车系、参数和销量页面；
+1. `scripts/fetch_16888_full_options.py` 低频读取公开车系、完整参数和销量页面；
 2. 完整原始表保存到 `data/raw/16888_full/tables/`，不在原文件上修改；
 3. 运行 PySpark 清洗任务；
 4. 任务输出 `data/processed/cars.csv`、`cars.parquet/` 和统计证据；
@@ -68,7 +68,7 @@ flowchart LR
 2. `src.spark_jobs.analyze_parameter_sales` 将数值、装备和复合参数适配为车系特征；
 3. 分析只连接统一最新月份销量，避免当前配置解释历史销量；
 4. 输出全量参数证据、交叉验证指标和趋势可用性状态；
-5. `src.web.analysis_loader` 将结果整理为只读 JSON，前端数据依据区负责展示参数重要度、回归系数和全量证据明细。
+5. `src.web.analysis_loader` 将结果整理为只读 JSON，前端数据依据区负责展示参数重要度、相关系数和全量证据明细。
 
 ## 5. 最小运行方式
 

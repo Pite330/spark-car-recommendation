@@ -1,8 +1,8 @@
 """低频采集 16888 在售车系的完整配置参数和月销量历史。
 
-本脚本与 ``fetch_16888_dataset.py`` 的消费者推荐快照相互独立。它先缓存每个
-车系的公开参数 JSON 和销量 HTML，再生成适合 Spark 分析的规范化长表。
-运行中断后可以直接重跑；已存在的原始响应默认不会重复请求。
+脚本先缓存每个车系的公开参数 JSON 和销量 HTML，再生成适合 Spark 清洗与
+参数分析的规范化完整表。运行中断后可以直接重跑；已存在的原始响应默认不会
+重复请求。
 """
 
 from __future__ import annotations
@@ -13,38 +13,19 @@ import gzip
 import html
 import json
 import re
+import time
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Iterable, Iterator
+from typing import Any, Iterable, Iterator
 
 import requests
 from bs4 import BeautifulSoup
 
-try:
-    from scripts.fetch_16888_dataset import (
-        EV_URL,
-        FORM_URL,
-        OPTIONS_API,
-        PoliteClient,
-        SeriesCandidate,
-        merge_candidates,
-        parse_number,
-        series_from_page,
-    )
-except ModuleNotFoundError:  # 直接执行 python scripts/fetch_16888_full_options.py
-    from fetch_16888_dataset import (  # type: ignore[no-redef]
-        EV_URL,
-        FORM_URL,
-        OPTIONS_API,
-        PoliteClient,
-        SeriesCandidate,
-        merge_candidates,
-        parse_number,
-        series_from_page,
-    )
-
-
+FORM_URL = "https://auto.16888.com/form.html"
+EV_URL = "https://auto.16888.com/ev.html"
+OPTIONS_API = "https://www.16888.com/auto/auto.php?mod=auto&extra=scapi"
 DEFAULT_OUTPUT_DIR = Path("data/raw/16888_full")
 ALL_BODY_LIMITS = {
     name: 100_000
@@ -54,6 +35,141 @@ ALL_ENERGY_LIMITS = {
     name: 100_000
     for name in ["纯电动车", "插电式混合电动车", "非插电式混合电动车", "增程式电动车"]
 }
+
+
+@dataclass
+class SeriesCandidate:
+    series_id: str
+    name: str
+    list_price_min: float | None
+    list_price_max: float | None
+    body_hints: set[str] = field(default_factory=set)
+    energy_hints: set[str] = field(default_factory=set)
+
+    @property
+    def source_url(self) -> str:
+        return f"https://www.16888.com/{self.series_id}/"
+
+    @property
+    def options_url(self) -> str:
+        return f"https://www.16888.com/{self.series_id}/options/"
+
+    @property
+    def sales_url(self) -> str:
+        return f"https://xl.16888.com/s/{self.series_id}/"
+
+
+class PoliteClient:
+    def __init__(self, delay: float) -> None:
+        self.delay = max(delay, 0)
+        self.last_request_at = 0.0
+        self.session = requests.Session()
+        self.session.headers.update(
+            {"User-Agent": "spark-car-recommendation-course-project/0.2 (+educational snapshot)"}
+        )
+
+    def get(self, url: str, *, referer: str | None = None, params: dict[str, Any] | None = None):
+        elapsed = time.monotonic() - self.last_request_at
+        if elapsed < self.delay:
+            time.sleep(self.delay - elapsed)
+        headers = {"Referer": referer} if referer else None
+        error: Exception | None = None
+        for attempt in range(3):
+            try:
+                response = self.session.get(
+                    url, params=params, headers=headers, timeout=25, allow_redirects=True
+                )
+                self.last_request_at = time.monotonic()
+                response.raise_for_status()
+                response.encoding = response.apparent_encoding or "utf-8"
+                return response
+            except requests.RequestException as exc:
+                error = exc
+                if attempt < 2:
+                    time.sleep(1.0 * (attempt + 1))
+        assert error is not None
+        raise error
+
+
+def parse_price_range(text: str) -> tuple[float | None, float | None]:
+    values = [float(value) for value in re.findall(r"\d+(?:\.\d+)?", text)]
+    if not values:
+        return None, None
+    return min(values), max(values)
+
+
+def parse_number(value: object) -> float | None:
+    match = re.search(r"\d+(?:\.\d+)?", str(value or ""))
+    return float(match.group()) if match else None
+
+
+def series_from_page(
+    page_html: str,
+    limits: dict[str, int],
+    *,
+    hint_type: str,
+) -> list[SeriesCandidate]:
+    soup = BeautifulSoup(page_html, "html.parser")
+    result: list[SeriesCandidate] = []
+    for title in soup.select("div.brand_title"):
+        category = title.get_text(" ", strip=True)
+        if category not in limits:
+            continue
+        box = title.find_next_sibling("div", class_="brand_box")
+        if box is None:
+            continue
+        accepted = 0
+        for item in box.select("li"):
+            series_link = next(
+                (
+                    link
+                    for link in item.select("a[href]")
+                    if re.fullmatch(r"https://www\.16888\.com/\d+/", link.get("href", ""))
+                    and link.get_text(" ", strip=True)
+                ),
+                None,
+            )
+            if series_link is None:
+                continue
+            series_id = series_link["href"].rstrip("/").rsplit("/", 1)[-1]
+            price_link = next(
+                (link for link in item.select("a[href]") if "price.16888.com/sr-" in link.get("href", "")),
+                None,
+            )
+            price_min, price_max = parse_price_range(
+                price_link.get_text(" ", strip=True) if price_link else ""
+            )
+            if price_min is None:
+                continue
+            candidate = SeriesCandidate(
+                series_id=series_id,
+                name=series_link.get_text(" ", strip=True),
+                list_price_min=price_min,
+                list_price_max=price_max,
+            )
+            if hint_type == "body":
+                candidate.body_hints.add(category)
+            else:
+                candidate.energy_hints.add(category)
+            result.append(candidate)
+            accepted += 1
+            if accepted >= limits[category]:
+                break
+    return result
+
+
+def merge_candidates(*groups: list[SeriesCandidate]) -> list[SeriesCandidate]:
+    merged: OrderedDict[str, SeriesCandidate] = OrderedDict()
+    for group in groups:
+        for candidate in group:
+            current = merged.get(candidate.series_id)
+            if current is None:
+                merged[candidate.series_id] = candidate
+            else:
+                current.body_hints.update(candidate.body_hints)
+                current.energy_hints.update(candidate.energy_hints)
+    return list(merged.values())
+
 
 SERIES_FIELDS = [
     "series_id",

@@ -1,15 +1,12 @@
 PYTHON ?= python3
 PDF_TARGETS := $(wildcard docs/*.pdf)
 
-.PHONY: setup data data-full-pilot data-full spark analyze pdf run test
+.PHONY: setup data-full-pilot data-full spark analyze pdf run test
 
 setup:
 	$(PYTHON) -m venv .venv
 	.venv/bin/python -m pip install -U pip
 	.venv/bin/python -m pip install -r requirements.txt
-
-data:
-	.venv/bin/python scripts/fetch_16888_dataset.py
 
 data-full-pilot:
 	.venv/bin/python scripts/fetch_16888_full_options.py --max-series 20

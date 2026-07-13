@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from scripts.fetch_16888_dataset import SeriesCandidate
 from scripts.fetch_16888_full_options import (
+    SeriesCandidate,
     clean_value,
     equipment_state,
     numeric_value,

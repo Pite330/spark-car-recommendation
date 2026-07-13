@@ -32,7 +32,7 @@
 
 ### 成员 A：数据采集与 Spark 数据工程
 
-- `scripts/fetch_16888_dataset.py`
+- `scripts/fetch_16888_full_options.py`
 - `src/spark_jobs/clean_cars.py`
 - `src/spark_jobs/__init__.py`
 - `tests/test_processed_data.py`
