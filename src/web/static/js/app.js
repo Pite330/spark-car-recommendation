@@ -327,15 +327,22 @@ function renderParameterCharts(rows) {
     .sort((a, b) => finiteNumber(b.random_forest_importance) - finiteNumber(a.random_forest_importance))
     .slice(0, 12).reverse();
   const labels = alignedRows.map(parameterLabel);
-  const maximumCoefficient = Math.max(...alignedRows.map((row) => Math.abs(finiteNumber(row.elastic_net_coefficient))), .001);
+  const coefficientValues = alignedRows.map((row) => {
+    const value = row.elastic_net_coefficient;
+    return value === null || value === undefined || value === '' ? null : finiteNumber(value);
+  });
+  const maximumCoefficient = Math.max(...coefficientValues.map((value) => Math.abs(value ?? 0)), .001);
+  const zeroCoefficientPoints = coefficientValues.flatMap((value, rowIndex) => (
+    value === 0 ? [{value: [0, rowIndex], rowIndex}] : []
+  ));
   const rowArea = {show: true, areaStyle: {color: ['rgba(45,123,93,.035)', 'rgba(255,255,255,0)']}};
   analysisParameterChart?.dispose();
   analysisParameterChart = echarts.init(document.querySelector('#analysis-parameter-chart'));
   analysisParameterChart.setOption({
     tooltip: {
       trigger: 'item',
-      formatter: ({dataIndex}) => {
-        const row = alignedRows[dataIndex];
+      formatter: ({data, dataIndex}) => {
+        const row = alignedRows[data?.rowIndex ?? dataIndex];
         return `<strong>${escapeHtml(parameterLabel(row))}</strong><br>随机森林重要度 ${formatDecimal(row.random_forest_importance, 4)}<br>Elastic Net 系数 ${formatDecimal(row.elastic_net_coefficient, 4)}`;
       }
     },
@@ -374,8 +381,8 @@ function renderParameterCharts(rows) {
       },
       {
         name: 'Elastic Net 系数', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barMaxWidth: 15,
-        data: alignedRows.map((row) => {
-          const value = finiteNumber(row.elastic_net_coefficient);
+        data: coefficientValues.map((value) => {
+          if (value === null) return null;
           return {
             value,
             itemStyle: {
@@ -384,6 +391,12 @@ function renderParameterCharts(rows) {
             }
           };
         })
+      },
+      {
+        name: '零系数', type: 'scatter', xAxisIndex: 1, yAxisIndex: 1, z: 3,
+        symbol: 'circle', symbolSize: 9, data: zeroCoefficientPoints,
+        itemStyle: {color: '#8b9690', borderColor: '#fffef8', borderWidth: 2},
+        label: {show: true, formatter: '0', position: 'right', distance: 5, color: '#747f79', fontSize: 10, fontWeight: 700}
       }
     ]
   });

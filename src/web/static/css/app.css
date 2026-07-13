@@ -200,6 +200,7 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none !important;
 .direction-legend span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 4px; border-radius: 50%; }
 .direction-legend .positive::before { background: var(--green-2); }
 .direction-legend .negative::before { background: var(--orange); }
+.direction-legend .zero::before { background: #8b9690; }
 .analysis-table-panel { padding-bottom: 10px; }
 .analysis-table-wrap { overflow-x: auto; margin: 18px -22px 0; }
 .analysis-table { width: 100%; min-width: 900px; border-collapse: collapse; }
