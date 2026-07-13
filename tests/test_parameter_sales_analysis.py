@@ -2,16 +2,34 @@ from __future__ import annotations
 
 import math
 
+import pytest
+from pyspark.sql import SparkSession
+
 from src.spark_jobs.analyze_parameter_sales import (
     average_ranks,
     benjamini_hochberg,
+    build_target,
+    CATEGORICAL_CONTROLS,
     classify_parameter,
     consolidated_parameter_results,
-    encode_energy_type,
     feature_name,
+    mode_by_series,
+    NUMERIC_CONTROLS,
     spearman,
     summarize_evidence,
 )
+
+
+@pytest.fixture(scope="module")
+def spark():
+    session = (
+        SparkSession.builder.master("local[1]")
+        .appName("parameter-sales-analysis-tests")
+        .config("spark.ui.enabled", "false")
+        .getOrCreate()
+    )
+    yield session
+    session.stop()
 
 
 def quality_row(**overrides):
@@ -54,11 +72,37 @@ def test_benjamini_hochberg_is_monotonic_in_sorted_order():
     assert math.isnan(adjusted[3])
 
 
-def test_energy_type_mapping_uses_ordered_numeric_values():
-    assert encode_energy_type("纯电") == 1.0
-    assert encode_energy_type("插混") == 0.5
-    assert encode_energy_type("燃油") == 0.0
-    assert encode_energy_type(None) is None
+def test_energy_type_remains_categorical_without_artificial_ordering():
+    assert "energy_type" in CATEGORICAL_CONTROLS
+    assert "energy_type" not in NUMERIC_CONTROLS
+
+
+def test_real_energy_label_is_preserved_as_a_category(spark):
+    trims = spark.createDataFrame(
+        [("series-1", "插电式混合动力"), ("series-1", "插电式混合动力")],
+        ["series_id", "energy_type_raw"],
+    )
+    rows = mode_by_series(trims, "energy_type_raw", "energy_type").collect()
+    assert rows[0]["energy_type"] == "插电式混合动力"
+
+
+def test_target_uses_only_the_shared_latest_month(spark):
+    sales = spark.createDataFrame(
+        [
+            ("series-1", "2026-05", 100),
+            ("series-1", "2026-06", 120),
+            ("series-2", "2026-05", 80),
+            ("series-2", "2026-06", 0),
+        ],
+        ["series_id", "sales_period", "sales"],
+    )
+    latest_period, target = build_target(sales)
+    rows = {row["series_id"]: row.asDict() for row in target.collect()}
+
+    assert latest_period == "2026-06"
+    assert rows["series-1"]["target_sales"] == 120
+    assert math.isclose(rows["series-1"]["target_log_sales"], math.log1p(120))
+    assert rows["series-2"]["target_sales"] == 0
 
 
 def test_evidence_summary_requires_adjusted_signal_and_direction_agreement():
