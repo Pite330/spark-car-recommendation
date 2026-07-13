@@ -11,7 +11,7 @@
 | 推荐聚合输入 / 输出 | 1746 / 1744 条车系能源记录（1573 个有效车系） |
 | 标准结果 | CSV + Parquet |
 | 统计结果 | 能源分布、车身分布、价格统计 |
-| 自动测试 | 30 passed |
+| 自动测试 | 31 passed |
 
 运行证据保存在 `data/processed/metadata.json` 和 `data/processed/stats.json`。
 

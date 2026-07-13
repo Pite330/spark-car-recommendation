@@ -22,6 +22,8 @@ def sample_cars():
             "fuel_consumption": None,
             "horsepower": 150 + index * 10,
             "model_year": 2025,
+            "sales": [1200, 900, 600, 300, 100][index],
+            "sales_period": "2026-06",
             "normalized_heat": None,
             "scenario_tags": ["城市通勤", "家庭出行"],
             "data_completeness": 1.0,

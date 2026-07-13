@@ -73,6 +73,7 @@ button { cursor: pointer; }
 .field select, .budget-inputs > div { height: 54px; border: 1px solid var(--line); border-radius: 12px; background: rgba(250,250,245,.88); transition: .2s; }
 .field select { padding: 0 16px; color: var(--ink); outline: none; appearance: none; background-image: linear-gradient(45deg,transparent 50%,#6f7b74 50%),linear-gradient(135deg,#6f7b74 50%,transparent 50%); background-position: calc(100% - 19px) 23px,calc(100% - 14px) 23px; background-size: 5px 5px; background-repeat: no-repeat; }
 .field select:focus, .budget-inputs > div:focus-within { border-color: var(--green-2); box-shadow: 0 0 0 3px rgba(45,123,93,.10); }
+.sales-field { max-width: 360px; }
 .budget-inputs { display: flex; align-items: center; gap: 10px; }
 .budget-inputs > div { flex: 1; display: flex; align-items: center; }
 .budget-inputs input { min-width: 0; width: 100%; height: 100%; padding: 0 4px 0 16px; border: 0; outline: 0; background: transparent; font-size: 17px; font-weight: 700; }
@@ -106,9 +107,11 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none !important;
 .card-brand { color: var(--green-2); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; }
 .recommendation-card.top .card-brand { color: var(--lime); }
 .recommendation-card h3 { margin: 7px 0 8px; font-size: 24px; letter-spacing: -.04em; }
-.car-price { margin: 0 0 20px; font-size: 14px; color: var(--muted); }
+.car-price { margin: 0 0 6px; font-size: 14px; color: var(--muted); }
 .car-price strong { color: inherit; font-size: 20px; }
 .recommendation-card.top .car-price { color: rgba(255,255,255,.68); }
+.car-sales { margin: 0 0 18px; color: #7d8881; font-size: 11px; font-weight: 700; }
+.recommendation-card.top .car-sales { color: rgba(255,255,255,.58); }
 .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 18px; }
 .tags span { padding: 6px 9px; border-radius: 7px; color: #425048; background: #e9ece6; font-size: 11px; }
 .recommendation-card.top .tags span { color: rgba(255,255,255,.82); background: rgba(255,255,255,.11); }
@@ -244,6 +247,7 @@ footer { display: flex; justify-content: space-between; padding-block: 32px 48px
   .section-heading > p { margin-top: 16px; text-align: left; }
   .preference-card { grid-template-columns: 1fr; padding: 22px; }
   .budget-field, .form-actions { grid-column: auto; }
+  .sales-field { max-width: none; }
   .form-actions { align-items: stretch; flex-direction: column; gap: 18px; }
   .primary-button { width: 100%; }
   .recommendation-grid, .insight-grid { grid-template-columns: 1fr; }

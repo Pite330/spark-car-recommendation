@@ -23,6 +23,7 @@ def test_homepage_uses_data_evidence_without_model_score_panels(dataset_file):
 
     assert "数据依据" in page
     assert 'id="analysis-coefficient-chart"' in page
+    assert 'name="min_sales"' in page
     assert "190 款车型已就绪" not in page
     assert "模型解释力" not in page
     assert "配置参数增量" not in page
@@ -44,6 +45,7 @@ def test_health_recommend_and_compare(dataset_file):
     assert response.status_code == 200
     assert response.json["request_id"].startswith("local-")
     assert 3 <= len(response.json["recommendations"]) <= 5
+    assert all("sales" in item for item in response.json["recommendations"])
 
     ids = [item["car_id"] for item in response.json["recommendations"][:2]]
     compared = client.post("/api/compare", json={"car_ids": ids})
@@ -82,6 +84,10 @@ def test_invalid_api_requests_return_contract_errors(dataset_file):
     invalid = client.post("/api/recommend", json={**REQUEST, "budget_min_wan": 25})
     assert invalid.status_code == 400
     assert invalid.json["error"]["code"] == "INVALID_BUDGET"
+
+    invalid_sales = client.post("/api/recommend", json={**REQUEST, "min_sales": -1})
+    assert invalid_sales.status_code == 400
+    assert invalid_sales.json["error"]["code"] == "INVALID_SALES"
 
     missing = client.post("/api/compare", json={"car_ids": ["car_0", "missing"]})
     assert missing.status_code == 404

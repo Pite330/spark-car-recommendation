@@ -55,6 +55,19 @@ def validate_request(payload: object) -> dict[str, object]:
     else:
         min_seats = None
 
+    min_sales = payload.get("min_sales")
+    if min_sales not in (None, ""):
+        if isinstance(min_sales, bool):
+            raise RecommendationError("INVALID_SALES", "最低月销量必须是非负整数", "min_sales")
+        try:
+            min_sales = int(min_sales)
+        except (TypeError, ValueError) as exc:
+            raise RecommendationError("INVALID_SALES", "最低月销量必须是非负整数", "min_sales") from exc
+        if min_sales < 0:
+            raise RecommendationError("INVALID_SALES", "最低月销量必须是非负整数", "min_sales")
+    else:
+        min_sales = None
+
     scenario = str(payload.get("scenario") or "").strip()
     if scenario and scenario not in ALLOWED_SCENARIOS:
         raise RecommendationError("INVALID_SCENARIO", "不支持该使用场景", "scenario")
@@ -67,6 +80,7 @@ def validate_request(payload: object) -> dict[str, object]:
         "brands": sorted({item.strip() for item in brands if item.strip()}),
         "scenario": scenario,
         "min_seats": min_seats,
+        "min_sales": min_sales,
         "limit": limit,
         "use_llm": bool(payload.get("use_llm", False)),
     }

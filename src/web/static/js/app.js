@@ -30,6 +30,12 @@ function displayPrice(car) {
   return min === max ? `${min} 万` : `${min}—${max} 万`;
 }
 
+function displaySales(car) {
+  if (car.sales === null || car.sales === undefined || car.sales === '') return '月销量暂无数据';
+  const period = car.sales_period ? `${car.sales_period} · ` : '';
+  return `${period}月销量 ${Number(car.sales).toLocaleString('zh-CN')} 辆`;
+}
+
 function recommendationCard(car, index) {
   const tags = [car.body_type, car.energy_type, car.seats ? `${car.seats} 座` : null]
     .filter(Boolean).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
@@ -39,6 +45,7 @@ function recommendationCard(car, index) {
       <span class="card-brand">${escapeHtml(car.brand)}</span>
       <h3>${escapeHtml(car.model_name)}</h3>
       <p class="car-price"><strong>${escapeHtml(displayPrice(car))}</strong> · 参考起售价</p>
+      <p class="car-sales">${escapeHtml(displaySales(car))}</p>
       <div class="tags">${tags}</div>
       <p class="reason">${escapeHtml(car.reason)}</p>
       <div class="card-footer">
@@ -76,6 +83,7 @@ form?.addEventListener('submit', async (event) => {
     brands: data.get('brand') ? [data.get('brand')] : [],
     scenario: data.get('scenario'),
     min_seats: data.get('min_seats') ? Number(data.get('min_seats')) : null,
+    min_sales: data.get('min_sales') ? Number(data.get('min_sales')) : null,
     limit: 5,
     use_llm: data.get('use_llm') === 'on'
   };
@@ -119,10 +127,13 @@ const comparisonRows = [
   ['参考价格', 'price_min_wan', (v, car) => displayPrice(car)],
   ['车身类型', 'body_type', (v) => v],
   ['能源类型', 'energy_type', (v) => v],
+  ['月销量', 'sales', (v) => `${Number(v).toLocaleString('zh-CN')} 辆`],
+  ['销量周期', 'sales_period', (v) => v],
   ['座位数', 'seats', (v) => `${v} 座`],
   ['续航', 'range_km', (v) => `${Number(v).toFixed(0)} km`],
   ['标注功率', 'horsepower', (v) => `${v} hp`],
-  ['车型年款', 'model_year', (v) => v]
+  ['车型年款', 'model_year', (v) => v],
+  ['数据完整度', 'data_completeness', (v) => `${Math.round(Number(v) * 100)}%`]
 ];
 
 function renderComparison(cars) {
@@ -134,14 +145,34 @@ function renderComparison(cars) {
   if (!window.echarts) return;
   if (compareChart) compareChart.dispose();
   compareChart = echarts.init(document.querySelector('#comparison-chart'));
-  const indicators = [
-    {key: 'price_min_wan', name: '价格'}, {key: 'range_km', name: '续航'},
-    {key: 'horsepower', name: '功率'}, {key: 'seats', name: '座位'}
-  ].filter((item) => cars.some((car) => car[item.key] != null));
-  const maxima = Object.fromEntries(indicators.map(({key}) => [key, Math.max(...cars.map((car) => Number(car[key]) || 0), 1)]));
+  const priceValues = cars.map((car) => Number(car.price_min_wan) || 0);
+  const minPrice = Math.min(...priceValues);
+  const maxPrice = Math.max(...priceValues);
+  const maxHorsepower = Math.max(...cars.map((car) => Number(car.horsepower) || 0), 1);
+  const maxSeats = Math.max(...cars.map((car) => Number(car.seats) || 0), 1);
+  const yearValues = cars.map((car) => Number(car.model_year) || 0).filter(Boolean);
+  const minYear = yearValues.length ? Math.min(...yearValues) : 0;
+  const maxYear = yearValues.length ? Math.max(...yearValues) : 0;
+  const dimensions = ['价格优势', '动力水平', '座位空间', '车型新鲜度', '市场热度', '数据完整度'];
+
+  function radarValues(car) {
+    const price = Number(car.price_min_wan) || 0;
+    const priceAdvantage = maxPrice === minPrice ? 100 : 30 + 70 * (maxPrice - price) / (maxPrice - minPrice);
+    const horsepower = car.horsepower == null ? 0 : 100 * Number(car.horsepower) / maxHorsepower;
+    const seats = car.seats == null ? 0 : 100 * Number(car.seats) / maxSeats;
+    const year = Number(car.model_year) || 0;
+    const freshness = !year ? 0 : maxYear === minYear ? 100 : 50 + 50 * (year - minYear) / (maxYear - minYear);
+    const heat = car.normalized_heat == null ? 0 : 100 * Number(car.normalized_heat);
+    const completeness = car.data_completeness == null ? 0 : 100 * Number(car.data_completeness);
+    return [priceAdvantage, horsepower, seats, freshness, heat, completeness].map((value) => Math.max(0, Math.min(100, Number(value.toFixed(1)))));
+  }
+
   compareChart.setOption({
     color: ['#1b5e44', '#ff7a3d', '#8da642'],
-    tooltip: {trigger: 'item'},
+    tooltip: {
+      trigger: 'item',
+      formatter: ({name, value}) => `<strong>${escapeHtml(name)}</strong><br>${dimensions.map((label, index) => `${label} ${formatDecimal(value[index], 1)}`).join('<br>')}`
+    },
     legend: {
       type: 'scroll', orient: 'horizontal', left: 'center', bottom: 10, width: '84%',
       itemWidth: 16, itemHeight: 9, itemGap: 18,
@@ -149,7 +180,7 @@ function renderComparison(cars) {
     },
     radar: {
       center: ['50%', '43%'], radius: '58%', splitNumber: 4,
-      indicator: indicators.map(({key, name}) => ({name, max: maxima[key]})),
+      indicator: dimensions.map((name) => ({name, max: 100})),
       axisName: {color: '#637068', fontSize: 12, padding: [4, 6]},
       axisLine: {lineStyle: {color: '#cfd6d1'}},
       splitLine: {lineStyle: {color: '#d9ddd8'}},
@@ -159,8 +190,8 @@ function renderComparison(cars) {
       type: 'radar', symbolSize: 7, lineStyle: {width: 2},
       data: cars.map((car) => ({
         name: car.model_name,
-        value: indicators.map(({key}) => Number(car[key]) || 0),
-        areaStyle: {opacity: .10}
+        value: radarValues(car),
+        areaStyle: {opacity: .14}
       }))
     }]
   });

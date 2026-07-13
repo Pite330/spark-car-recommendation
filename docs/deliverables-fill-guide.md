@@ -18,7 +18,7 @@
 | 可选增强 | DeepSeek OpenAI 兼容接口，仅润色结构化推荐依据 |
 | GitHub | `https://github.com/Pite330/spark-car-recommendation` |
 | MVP 演示条件 | 15—20 万、SUV、纯电、城市通勤、至少 5 座 |
-| 当前测试结果 | 30 passed |
+| 当前测试结果 | 31 passed |
 
 ### 仍需小组统一补充
 
@@ -207,7 +207,7 @@ Sheet2 记录 `docs/team-plan.md` 中的逐文件清单和互审关系，Sheet3 
 - 2—3 款车型对比表和雷达图；
 - Spark 能源/车身分布图；
 - DeepSeek 正常说明和关闭/失败后的模板说明；
-- `pytest` 的 `30 passed`；
+- `pytest` 的 `31 passed`；
 - GitHub 仓库首页和提交记录。
 
 截图文件建议统一放到 `docs/images/`，命名使用 `01-home.png`、`02-spark-output.png` 等，不要截图 `.env`、API Key、Cookie 或终端中的敏感信息。
@@ -217,7 +217,7 @@ Sheet2 记录 `docs/team-plan.md` 中的逐文件清单和互审关系，Sheet3 
 - 所有材料统一使用同一个项目名、组号、成员顺序和日期；
 - 数据源统一写 16888，不再出现 China Car Price Index、美元换算或 84 款；
 - 数据量统一写原始 1620 个车系、Spark 输出 1573 个有效车系和 1744 条车系能源记录；
-- 自动化测试统一写 30 passed，若后续新增测试则重新运行并同步更新；
+- 自动化测试统一写 31 passed，若后续新增测试则重新运行并同步更新；
 - 不把缺失的续航/油耗写成已采集；
 - 不把 DeepSeek 写成推荐算法或车型决策者；
 - 不声称使用 MySQL、HDFS、机器学习训练、登录后台等未实现功能；
