@@ -16,6 +16,19 @@ REQUEST = {
 }
 
 
+def test_homepage_uses_data_evidence_without_model_score_panels(dataset_file):
+    app = create_app({"TESTING": True, "DATASET_PATH": str(dataset_file)})
+
+    page = app.test_client().get("/").get_data(as_text=True)
+
+    assert "数据依据" in page
+    assert 'id="analysis-coefficient-chart"' in page
+    assert "190 款车型已就绪" not in page
+    assert "模型解释力" not in page
+    assert "配置参数增量" not in page
+    assert "analysis-model-chart" not in page
+
+
 def test_health_recommend_and_compare(dataset_file):
     app = create_app({"TESTING": True, "DATASET_PATH": str(dataset_file)})
     client = app.test_client()

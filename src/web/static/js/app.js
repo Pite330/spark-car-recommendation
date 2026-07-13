@@ -214,13 +214,11 @@ const analysisUi = {
   filter: document.querySelector('#analysis-group-filter'),
   tableBody: document.querySelector('#analysis-table-body'),
   resultCount: document.querySelector('#analysis-result-count'),
-  tableCaption: document.querySelector('#analysis-table-caption'),
-  liftCards: document.querySelector('#analysis-lift-cards')
+  tableCaption: document.querySelector('#analysis-table-caption')
 };
 let analysisData = null;
-let analysisModelChart = null;
 let analysisImportanceChart = null;
-let analysisDirectionChart = null;
+let analysisCoefficientChart = null;
 
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);
@@ -247,56 +245,11 @@ function renderAnalysisKpis(data) {
     ['分析样本', data.analysis_rows, '同期车系销量记录'],
     ['原始参数', data.parameter_definitions, '进入 Adapter 前'],
     ['标准特征', data.adapter_features, '完成统一编码'],
-    ['模型特征', data.model_features, '进入训练与验证'],
     ['显著信号', data.significant_features, 'FDR 校正后']
   ];
   analysisUi.kpis.innerHTML = items.map(([label, value, note]) => `
     <article class="analysis-kpi"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value ?? '—')}</strong><small>${escapeHtml(note)}</small></article>
   `).join('');
-}
-
-function renderAnalysisModel(data) {
-  if (!window.echarts) return;
-  const metrics = Array.isArray(data.metrics) ? data.metrics : [];
-  analysisModelChart?.dispose();
-  analysisModelChart = echarts.init(document.querySelector('#analysis-model-chart'));
-  analysisModelChart.setOption({
-    color: ['#2d7b5d'],
-    grid: {left: 118, right: 34, top: 28, bottom: 38},
-    tooltip: {
-      trigger: 'axis', axisPointer: {type: 'shadow'},
-      formatter: (items) => {
-        const index = items[0]?.dataIndex ?? 0;
-        const metric = metrics[index] || {};
-        return `<strong>${escapeHtml(metric.label || metric.key || '模型')}</strong><br>R² ${formatDecimal(metric.r2)}<br>RMSE ${formatDecimal(metric.rmse)} · MAE ${formatDecimal(metric.mae)}`;
-      }
-    },
-    xAxis: {type: 'value', min: 0, axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
-    yAxis: {
-      type: 'category', inverse: true, data: metrics.map((item) => item.label || item.key),
-      axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#4e5c54', width: 105, overflow: 'truncate'}
-    },
-    series: [{
-      type: 'bar', barMaxWidth: 18, data: metrics.map((item, index) => ({
-        value: finiteNumber(item.r2),
-        itemStyle: {color: index === 0 ? '#9ba9a1' : index === metrics.length - 1 ? '#ff7a3d' : '#2d7b5d', borderRadius: [0, 7, 7, 0]}
-      })),
-      label: {show: true, position: 'right', color: '#33453b', formatter: ({value}) => finiteNumber(value).toFixed(3)}
-    }]
-  });
-}
-
-function renderAnalysisLift(data) {
-  const values = [
-    ['Elastic Net', data.incremental_r2?.elastic_net],
-    ['随机森林', data.incremental_r2?.random_forest]
-  ];
-  const maximum = Math.max(...values.map(([, value]) => Math.abs(finiteNumber(value))), .001);
-  analysisUi.liftCards.innerHTML = values.map(([label, value]) => {
-    const number = finiteNumber(value);
-    const width = Math.max(3, Math.abs(number) / maximum * 100);
-    return `<div class="lift-card"><div><span>${escapeHtml(label)}</span><strong>${number >= 0 ? '+' : ''}${formatDecimal(number)}</strong></div><div class="lift-bar" aria-hidden="true"><i style="width:${width.toFixed(1)}%"></i></div></div>`;
-  }).join('');
 }
 
 function signalFor(parameter) {
@@ -328,25 +281,47 @@ function renderParameterCharts(rows) {
     tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}, valueFormatter: (value) => formatDecimal(value, 4)},
     xAxis: {type: 'value', axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
     yAxis: {type: 'category', data: important.map(parameterLabel), axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 120, overflow: 'truncate'}},
-    series: [{type: 'bar', barMaxWidth: 15, data: important.map((row) => finiteNumber(row.random_forest_importance)), itemStyle: {color: '#2d7b5d', borderRadius: [0, 6, 6, 0]}}]
+    series: [{type: 'bar', barMaxWidth: 15, data: important.map((row) => finiteNumber(row.random_forest_importance)), itemStyle: {color: '#0f63ff', borderRadius: [0, 6, 6, 0]}}]
   });
 
-  const directionRows = [...rows]
-    .sort((a, b) => Math.abs(finiteNumber(b.spearman_rho)) - Math.abs(finiteNumber(a.spearman_rho)))
-    .slice(0, 18);
-  const maxImportance = Math.max(...directionRows.map((row) => finiteNumber(row.random_forest_importance)), .001);
-  analysisDirectionChart?.dispose();
-  analysisDirectionChart = echarts.init(document.querySelector('#analysis-direction-chart'));
-  analysisDirectionChart.setOption({
-    grid: {left: 136, right: 28, top: 25, bottom: 35},
-    tooltip: {formatter: ({data}) => `<strong>${escapeHtml(data.name)}</strong><br>Spearman ρ ${formatDecimal(data.value[0])}<br>RF 重要度 ${formatDecimal(data.importance, 4)}`},
-    xAxis: {type: 'value', min: -1, max: 1, axisLine: {lineStyle: {color: '#aab4ae'}}, axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
-    yAxis: {type: 'category', inverse: true, data: directionRows.map(parameterLabel), axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 124, overflow: 'truncate'}},
-    series: [{type: 'scatter', data: directionRows.map((row, index) => {
-      const rho = finiteNumber(row.spearman_rho);
-      const importance = finiteNumber(row.random_forest_importance);
-      return {name: parameterLabel(row), value: [rho, index], importance, symbolSize: 8 + 18 * Math.sqrt(importance / maxImportance), itemStyle: {color: rho >= 0 ? '#2d7b5d' : '#ff7a3d', opacity: .82}};
-    }), emphasis: {scale: 1.25}}]
+  const coefficients = [...rows]
+    .sort((a, b) => Math.abs(finiteNumber(b.elastic_net_coefficient)) - Math.abs(finiteNumber(a.elastic_net_coefficient)))
+    .slice(0, 12)
+    .reverse();
+  const maximum = Math.max(...coefficients.map((row) => Math.abs(finiteNumber(row.elastic_net_coefficient))), .001);
+  analysisCoefficientChart?.dispose();
+  analysisCoefficientChart = echarts.init(document.querySelector('#analysis-coefficient-chart'));
+  analysisCoefficientChart.setOption({
+    grid: {left: 132, right: 34, top: 25, bottom: 30},
+    tooltip: {
+      trigger: 'axis', axisPointer: {type: 'shadow'},
+      formatter: (items) => {
+        const item = items[0];
+        return `<strong>${escapeHtml(item?.name || '未命名参数')}</strong><br>Elastic Net 系数 ${formatDecimal(item?.value, 4)}`;
+      }
+    },
+    xAxis: {
+      type: 'value', min: -maximum, max: maximum,
+      axisLine: {show: true, lineStyle: {color: '#aab4ae'}},
+      axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}
+    },
+    yAxis: {
+      type: 'category', data: coefficients.map(parameterLabel),
+      axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 120, overflow: 'truncate'}
+    },
+    series: [{
+      type: 'bar', barMaxWidth: 15,
+      data: coefficients.map((row) => {
+        const value = finiteNumber(row.elastic_net_coefficient);
+        return {
+          value,
+          itemStyle: {
+            color: value >= 0 ? '#0f63ff' : '#ff6b35',
+            borderRadius: value >= 0 ? [0, 6, 6, 0] : [6, 0, 0, 6]
+          }
+        };
+      })
+    }]
   });
 }
 
@@ -384,8 +359,6 @@ function renderFilteredAnalysis() {
 function renderAnalysis(data) {
   analysisUi.period.textContent = data.sales_period || '未标注';
   renderAnalysisKpis(data);
-  renderAnalysisModel(data);
-  renderAnalysisLift(data);
 
   const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
   analysisUi.warnings.classList.toggle('is-hidden', warnings.length === 0);
@@ -422,9 +395,8 @@ async function loadAnalysis() {
 analysisUi.filter?.addEventListener('change', renderFilteredAnalysis);
 document.querySelector('#analysis-retry')?.addEventListener('click', loadAnalysis);
 window.addEventListener('resize', () => {
-  analysisModelChart?.resize();
   analysisImportanceChart?.resize();
-  analysisDirectionChart?.resize();
+  analysisCoefficientChart?.resize();
 });
 
 loadAnalysis();
