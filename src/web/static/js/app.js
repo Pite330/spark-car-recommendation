@@ -281,7 +281,7 @@ function renderParameterCharts(rows) {
     tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}, valueFormatter: (value) => formatDecimal(value, 4)},
     xAxis: {type: 'value', axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
     yAxis: {type: 'category', data: important.map(parameterLabel), axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 120, overflow: 'truncate'}},
-    series: [{type: 'bar', barMaxWidth: 15, data: important.map((row) => finiteNumber(row.random_forest_importance)), itemStyle: {color: '#0f63ff', borderRadius: [0, 6, 6, 0]}}]
+    series: [{type: 'bar', barMaxWidth: 15, data: important.map((row) => finiteNumber(row.random_forest_importance)), itemStyle: {color: '#2d7b5d', borderRadius: [0, 6, 6, 0]}}]
   });
 
   const coefficients = [...rows]
@@ -316,7 +316,7 @@ function renderParameterCharts(rows) {
         return {
           value,
           itemStyle: {
-            color: value >= 0 ? '#0f63ff' : '#ff6b35',
+            color: value >= 0 ? '#2d7b5d' : '#ff7a3d',
             borderRadius: value >= 0 ? [0, 6, 6, 0] : [6, 0, 0, 6]
           }
         };
