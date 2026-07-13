@@ -201,6 +201,7 @@ button:disabled { opacity: .45; cursor: not-allowed; transform: none !important;
 .direction-legend .positive::before { background: var(--green-2); }
 .direction-legend .negative::before { background: var(--orange); }
 .direction-legend .zero::before { background: #8b9690; }
+.direction-legend .missing::before { box-sizing: border-box; border: 1px solid #9da7a1; background: transparent; }
 .analysis-table-panel { padding-bottom: 10px; }
 .analysis-table-wrap { overflow-x: auto; margin: 18px -22px 0; }
 .analysis-table { width: 100%; min-width: 900px; border-collapse: collapse; }

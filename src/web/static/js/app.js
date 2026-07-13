@@ -327,14 +327,17 @@ function renderParameterCharts(rows) {
     .sort((a, b) => finiteNumber(b.random_forest_importance) - finiteNumber(a.random_forest_importance))
     .slice(0, 12).reverse();
   const labels = alignedRows.map(parameterLabel);
-  const coefficientValues = alignedRows.map((row) => {
-    const value = row.elastic_net_coefficient;
+  const correlationValues = alignedRows.map((row) => {
+    const value = row.spearman_rho;
     return value === null || value === undefined || value === '' ? null : finiteNumber(value);
   });
-  const maximumCoefficient = Math.max(...coefficientValues.map((value) => Math.abs(value ?? 0)), .001);
-  const coefficientExtent = maximumCoefficient * 1.22;
-  const zeroCoefficientPoints = coefficientValues.flatMap((value, rowIndex) => (
+  const maximumCorrelation = Math.max(...correlationValues.map((value) => Math.abs(value ?? 0)), .001);
+  const correlationExtent = maximumCorrelation * 1.22;
+  const zeroCorrelationPoints = correlationValues.flatMap((value, rowIndex) => (
     value === 0 ? [{value: [0, rowIndex], rowIndex}] : []
+  ));
+  const missingCorrelationPoints = correlationValues.flatMap((value, rowIndex) => (
+    value === null ? [{value: [0, rowIndex], rowIndex}] : []
   ));
   const rowArea = {show: true, areaStyle: {color: ['rgba(45,123,93,.035)', 'rgba(255,255,255,0)']}};
   analysisParameterChart?.dispose();
@@ -344,7 +347,7 @@ function renderParameterCharts(rows) {
       trigger: 'item',
       formatter: ({data, dataIndex}) => {
         const row = alignedRows[data?.rowIndex ?? dataIndex];
-        return `<strong>${escapeHtml(parameterLabel(row))}</strong><br>随机森林重要度 ${formatDecimal(row.random_forest_importance, 4)}<br>Elastic Net 系数 ${formatDecimal(row.elastic_net_coefficient, 4)}`;
+        return `<strong>${escapeHtml(parameterLabel(row))}</strong><br>随机森林重要度 ${formatDecimal(row.random_forest_importance, 4)}<br>Spearman 相关系数 ${formatDecimal(row.spearman_rho, 4)}`;
       }
     },
     grid: [
@@ -358,7 +361,7 @@ function renderParameterCharts(rows) {
         splitLine: {lineStyle: {color: '#e2e5df'}}
       },
       {
-        type: 'value', gridIndex: 1, min: -coefficientExtent, max: coefficientExtent,
+        type: 'value', gridIndex: 1, min: -correlationExtent, max: correlationExtent,
         axisLine: {show: true, lineStyle: {color: '#aab4ae'}},
         axisLabel: {color: '#7d8881', formatter: (value) => formatDecimal(value, 2)},
         splitLine: {lineStyle: {color: '#e2e5df'}}
@@ -382,8 +385,8 @@ function renderParameterCharts(rows) {
         itemStyle: {color: '#2d7b5d', borderRadius: [0, 6, 6, 0]}
       },
       {
-        name: 'Elastic Net 系数', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barMaxWidth: 15,
-        data: coefficientValues.map((value) => {
+        name: 'Spearman 相关系数', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barMaxWidth: 15,
+        data: correlationValues.map((value) => {
           if (value === null) return null;
           return {
             value,
@@ -404,10 +407,16 @@ function renderParameterCharts(rows) {
         })
       },
       {
-        name: '零系数', type: 'scatter', xAxisIndex: 1, yAxisIndex: 1, z: 3,
-        symbol: 'circle', symbolSize: 9, data: zeroCoefficientPoints,
+        name: '零相关', type: 'scatter', xAxisIndex: 1, yAxisIndex: 1, z: 3,
+        symbol: 'circle', symbolSize: 9, data: zeroCorrelationPoints,
         itemStyle: {color: '#8b9690', borderColor: '#fffef8', borderWidth: 2},
         label: {show: true, formatter: '0', position: 'right', distance: 5, color: '#747f79', fontSize: 10, fontWeight: 700}
+      },
+      {
+        name: '不可计算', type: 'scatter', xAxisIndex: 1, yAxisIndex: 1, z: 3,
+        symbol: 'diamond', symbolSize: 10, data: missingCorrelationPoints,
+        itemStyle: {color: '#fffef8', borderColor: '#9da7a1', borderWidth: 2},
+        label: {show: true, formatter: '—', position: 'right', distance: 5, color: '#747f79', fontSize: 11, fontWeight: 700}
       }
     ]
   });
@@ -418,19 +427,17 @@ function renderParameterTable(rows, group) {
   analysisUi.resultCount.textContent = `${sortedRows.length} 项`;
   analysisUi.tableCaption.textContent = group ? `${group} · 按随机森林重要度排序` : '全部分组 · 按随机森林重要度排序';
   if (!sortedRows.length) {
-    analysisUi.tableBody.innerHTML = '<tr><td class="analysis-empty" colspan="7">当前分组暂无可展示参数</td></tr>';
+    analysisUi.tableBody.innerHTML = '<tr><td class="analysis-empty" colspan="6">当前分组暂无可展示参数</td></tr>';
     return;
   }
   analysisUi.tableBody.innerHTML = sortedRows.map((row) => {
     const rho = row.spearman_rho === null || row.spearman_rho === '' ? null : finiteNumber(row.spearman_rho);
-    const coefficient = row.elastic_net_coefficient === null || row.elastic_net_coefficient === '' ? null : finiteNumber(row.elastic_net_coefficient);
     const signal = signalFor(row);
     return `<tr>
       <td>${escapeHtml(parameterLabel(row))}</td>
       <td>${escapeHtml(row.group_name || '其他')} / ${escapeHtml(row.parameter_type || '—')}</td>
       <td class="${rho > 0 ? 'metric-positive' : rho < 0 ? 'metric-negative' : ''}">${rho > 0 ? '+' : ''}${formatDecimal(rho)}</td>
       <td>${formatDecimal(row.fdr_q_value, 4)}</td>
-      <td class="${coefficient > 0 ? 'metric-positive' : coefficient < 0 ? 'metric-negative' : ''}">${coefficient > 0 ? '+' : ''}${formatDecimal(coefficient, 4)}</td>
       <td>${formatDecimal(row.random_forest_importance, 4)}</td>
       <td><span class="signal-stack"><span class="signal-badge ${signal.className}">${signal.label}</span><span class="trend-badge" title="${escapeHtml(analysisData?.trend_status_reason || '')}">${row.trend_status === 'insufficient_history' ? '趋势数据不足' : escapeHtml(row.trend_status || '趋势待评估')}</span></span></td>
     </tr>`;

@@ -23,6 +23,8 @@ def test_homepage_uses_data_evidence_without_model_score_panels(dataset_file):
 
     assert "数据依据" in page
     assert 'id="analysis-parameter-chart"' in page
+    assert "Spearman 相关系数" in page
+    assert "Elastic Net 系数" not in page
     assert 'name="min_sales"' in page
     assert "190 款车型已就绪" not in page
     assert "模型解释力" not in page

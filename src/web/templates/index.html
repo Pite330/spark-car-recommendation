@@ -193,7 +193,7 @@
             <strong id="analysis-period">加载中</strong>
           </div>
         </div>
-        <p class="analysis-lead">结合参数关联、Elastic Net 与随机森林，了解不同参数在当前数据中的统计表现。分析结果仅用于辅助理解推荐依据，不代表单一参数与销量之间存在因果关系。</p>
+        <p class="analysis-lead">结合 Spearman 参数相关与随机森林重要度，了解不同参数在当前数据中的统计表现。分析结果仅用于辅助理解推荐依据，不代表单一参数与销量之间存在因果关系。</p>
 
         <div id="analysis-loading" class="analysis-state" role="status" aria-live="polite">
           <span class="analysis-spinner" aria-hidden="true"></span>
@@ -221,12 +221,12 @@
 
           <article class="analysis-panel analysis-paired-panel">
             <div class="panel-heading">
-              <div><h3>参数重要度与回归方向</h3><p>按随机森林重要度选取 Top 12；同一水平行展示同一参数的 Elastic Net 系数，不再按系数二次排序</p></div>
-              <div class="direction-legend"><span class="positive">正系数</span><span class="negative">负系数</span><span class="zero">零系数</span></div>
+              <div><h3>参数重要度与相关方向</h3><p>按随机森林重要度选取 Top 12；同一水平行展示同一参数的 Spearman 相关系数</p></div>
+              <div class="direction-legend"><span class="positive">正相关</span><span class="negative">负相关</span><span class="zero">零相关</span><span class="missing">不可计算</span></div>
             </div>
             <div class="analysis-chart-viewport">
-              <div class="paired-axis-labels" aria-hidden="true"><span>随机森林重要度</span><span>Elastic Net 系数</span></div>
-              <div id="analysis-parameter-chart" class="analysis-chart analysis-chart-paired" role="img" aria-label="按参数对齐的随机森林重要度与 Elastic Net 回归系数图"></div>
+              <div class="paired-axis-labels" aria-hidden="true"><span>随机森林重要度</span><span>Spearman 相关系数</span></div>
+              <div id="analysis-parameter-chart" class="analysis-chart analysis-chart-paired" role="img" aria-label="按参数对齐的随机森林重要度与 Spearman 相关系数图"></div>
             </div>
           </article>
 
@@ -234,7 +234,7 @@
             <div class="panel-heading"><div><h3>全量参数证据明细</h3><p id="analysis-table-caption">187 项来源参数，按随机森林重要度排序</p></div><span class="panel-chip" id="analysis-result-count">0 项</span></div>
             <div class="analysis-table-wrap">
               <table class="analysis-table">
-                <thead><tr><th scope="col">参数</th><th scope="col">分组 / 类型</th><th scope="col">Spearman ρ</th><th scope="col">FDR q</th><th scope="col">Elastic Net</th><th scope="col">RF 重要度</th><th scope="col">判断</th></tr></thead>
+                <thead><tr><th scope="col">参数</th><th scope="col">分组 / 类型</th><th scope="col">Spearman ρ</th><th scope="col">FDR q</th><th scope="col">RF 重要度</th><th scope="col">判断</th></tr></thead>
                 <tbody id="analysis-table-body"></tbody>
               </table>
             </div>
