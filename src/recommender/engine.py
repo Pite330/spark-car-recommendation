@@ -27,6 +27,10 @@ PUBLIC_FIELDS = [
     "fuel_consumption",
     "horsepower",
     "model_year",
+    "sales",
+    "sales_period",
+    "normalized_heat",
+    "data_completeness",
 ]
 
 
@@ -75,6 +79,11 @@ class RecommendationEngine:
         if min_seats is not None:
             seats = car.get("seats")
             if seats is None or int(seats) < int(min_seats):
+                return False
+        min_sales = request.get("min_sales")
+        if min_sales is not None:
+            sales = car.get("sales")
+            if sales is None or int(sales) < int(min_sales):
                 return False
         return True
 

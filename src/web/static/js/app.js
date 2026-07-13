@@ -30,6 +30,12 @@ function displayPrice(car) {
   return min === max ? `${min} 万` : `${min}—${max} 万`;
 }
 
+function displaySales(car) {
+  if (car.sales === null || car.sales === undefined || car.sales === '') return '月销量暂无数据';
+  const period = car.sales_period ? `${car.sales_period} · ` : '';
+  return `${period}月销量 ${Number(car.sales).toLocaleString('zh-CN')} 辆`;
+}
+
 function recommendationCard(car, index) {
   const tags = [car.body_type, car.energy_type, car.seats ? `${car.seats} 座` : null]
     .filter(Boolean).map((tag) => `<span>${escapeHtml(tag)}</span>`).join('');
@@ -39,6 +45,7 @@ function recommendationCard(car, index) {
       <span class="card-brand">${escapeHtml(car.brand)}</span>
       <h3>${escapeHtml(car.model_name)}</h3>
       <p class="car-price"><strong>${escapeHtml(displayPrice(car))}</strong> · 参考起售价</p>
+      <p class="car-sales">${escapeHtml(displaySales(car))}</p>
       <div class="tags">${tags}</div>
       <p class="reason">${escapeHtml(car.reason)}</p>
       <div class="card-footer">
@@ -76,6 +83,7 @@ form?.addEventListener('submit', async (event) => {
     brands: data.get('brand') ? [data.get('brand')] : [],
     scenario: data.get('scenario'),
     min_seats: data.get('min_seats') ? Number(data.get('min_seats')) : null,
+    min_sales: data.get('min_sales') ? Number(data.get('min_sales')) : null,
     limit: 5,
     use_llm: data.get('use_llm') === 'on'
   };
@@ -119,10 +127,13 @@ const comparisonRows = [
   ['参考价格', 'price_min_wan', (v, car) => displayPrice(car)],
   ['车身类型', 'body_type', (v) => v],
   ['能源类型', 'energy_type', (v) => v],
+  ['月销量', 'sales', (v) => `${Number(v).toLocaleString('zh-CN')} 辆`],
+  ['销量周期', 'sales_period', (v) => v],
   ['座位数', 'seats', (v) => `${v} 座`],
   ['续航', 'range_km', (v) => `${Number(v).toFixed(0)} km`],
   ['标注功率', 'horsepower', (v) => `${v} hp`],
-  ['车型年款', 'model_year', (v) => v]
+  ['车型年款', 'model_year', (v) => v],
+  ['数据完整度', 'data_completeness', (v) => `${Math.round(Number(v) * 100)}%`]
 ];
 
 function renderComparison(cars) {
@@ -134,14 +145,34 @@ function renderComparison(cars) {
   if (!window.echarts) return;
   if (compareChart) compareChart.dispose();
   compareChart = echarts.init(document.querySelector('#comparison-chart'));
-  const indicators = [
-    {key: 'price_min_wan', name: '价格'}, {key: 'range_km', name: '续航'},
-    {key: 'horsepower', name: '功率'}, {key: 'seats', name: '座位'}
-  ].filter((item) => cars.some((car) => car[item.key] != null));
-  const maxima = Object.fromEntries(indicators.map(({key}) => [key, Math.max(...cars.map((car) => Number(car[key]) || 0), 1)]));
+  const priceValues = cars.map((car) => Number(car.price_min_wan) || 0);
+  const minPrice = Math.min(...priceValues);
+  const maxPrice = Math.max(...priceValues);
+  const maxHorsepower = Math.max(...cars.map((car) => Number(car.horsepower) || 0), 1);
+  const maxSeats = Math.max(...cars.map((car) => Number(car.seats) || 0), 1);
+  const yearValues = cars.map((car) => Number(car.model_year) || 0).filter(Boolean);
+  const minYear = yearValues.length ? Math.min(...yearValues) : 0;
+  const maxYear = yearValues.length ? Math.max(...yearValues) : 0;
+  const dimensions = ['价格优势', '动力水平', '座位空间', '车型新鲜度', '市场热度', '数据完整度'];
+
+  function radarValues(car) {
+    const price = Number(car.price_min_wan) || 0;
+    const priceAdvantage = maxPrice === minPrice ? 100 : 30 + 70 * (maxPrice - price) / (maxPrice - minPrice);
+    const horsepower = car.horsepower == null ? 0 : 100 * Number(car.horsepower) / maxHorsepower;
+    const seats = car.seats == null ? 0 : 100 * Number(car.seats) / maxSeats;
+    const year = Number(car.model_year) || 0;
+    const freshness = !year ? 0 : maxYear === minYear ? 100 : 50 + 50 * (year - minYear) / (maxYear - minYear);
+    const heat = car.normalized_heat == null ? 0 : 100 * Number(car.normalized_heat);
+    const completeness = car.data_completeness == null ? 0 : 100 * Number(car.data_completeness);
+    return [priceAdvantage, horsepower, seats, freshness, heat, completeness].map((value) => Math.max(0, Math.min(100, Number(value.toFixed(1)))));
+  }
+
   compareChart.setOption({
     color: ['#1b5e44', '#ff7a3d', '#8da642'],
-    tooltip: {trigger: 'item'},
+    tooltip: {
+      trigger: 'item',
+      formatter: ({name, value}) => `<strong>${escapeHtml(name)}</strong><br>${dimensions.map((label, index) => `${label} ${formatDecimal(value[index], 1)}`).join('<br>')}`
+    },
     legend: {
       type: 'scroll', orient: 'horizontal', left: 'center', bottom: 10, width: '84%',
       itemWidth: 16, itemHeight: 9, itemGap: 18,
@@ -149,7 +180,7 @@ function renderComparison(cars) {
     },
     radar: {
       center: ['50%', '43%'], radius: '58%', splitNumber: 4,
-      indicator: indicators.map(({key, name}) => ({name, max: maxima[key]})),
+      indicator: dimensions.map((name) => ({name, max: 100})),
       axisName: {color: '#637068', fontSize: 12, padding: [4, 6]},
       axisLine: {lineStyle: {color: '#cfd6d1'}},
       splitLine: {lineStyle: {color: '#d9ddd8'}},
@@ -159,8 +190,8 @@ function renderComparison(cars) {
       type: 'radar', symbolSize: 7, lineStyle: {width: 2},
       data: cars.map((car) => ({
         name: car.model_name,
-        value: indicators.map(({key}) => Number(car[key]) || 0),
-        areaStyle: {opacity: .10}
+        value: radarValues(car),
+        areaStyle: {opacity: .14}
       }))
     }]
   });
@@ -214,13 +245,11 @@ const analysisUi = {
   filter: document.querySelector('#analysis-group-filter'),
   tableBody: document.querySelector('#analysis-table-body'),
   resultCount: document.querySelector('#analysis-result-count'),
-  tableCaption: document.querySelector('#analysis-table-caption'),
-  liftCards: document.querySelector('#analysis-lift-cards')
+  tableCaption: document.querySelector('#analysis-table-caption')
 };
 let analysisData = null;
-let analysisModelChart = null;
 let analysisImportanceChart = null;
-let analysisDirectionChart = null;
+let analysisCoefficientChart = null;
 
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);
@@ -247,56 +276,11 @@ function renderAnalysisKpis(data) {
     ['分析样本', data.analysis_rows, '同期车系销量记录'],
     ['原始参数', data.parameter_definitions, '进入 Adapter 前'],
     ['标准特征', data.adapter_features, '完成统一编码'],
-    ['模型特征', data.model_features, '进入训练与验证'],
     ['显著信号', data.significant_features, 'FDR 校正后']
   ];
   analysisUi.kpis.innerHTML = items.map(([label, value, note]) => `
     <article class="analysis-kpi"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value ?? '—')}</strong><small>${escapeHtml(note)}</small></article>
   `).join('');
-}
-
-function renderAnalysisModel(data) {
-  if (!window.echarts) return;
-  const metrics = Array.isArray(data.metrics) ? data.metrics : [];
-  analysisModelChart?.dispose();
-  analysisModelChart = echarts.init(document.querySelector('#analysis-model-chart'));
-  analysisModelChart.setOption({
-    color: ['#2d7b5d'],
-    grid: {left: 118, right: 34, top: 28, bottom: 38},
-    tooltip: {
-      trigger: 'axis', axisPointer: {type: 'shadow'},
-      formatter: (items) => {
-        const index = items[0]?.dataIndex ?? 0;
-        const metric = metrics[index] || {};
-        return `<strong>${escapeHtml(metric.label || metric.key || '模型')}</strong><br>R² ${formatDecimal(metric.r2)}<br>RMSE ${formatDecimal(metric.rmse)} · MAE ${formatDecimal(metric.mae)}`;
-      }
-    },
-    xAxis: {type: 'value', min: 0, axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
-    yAxis: {
-      type: 'category', inverse: true, data: metrics.map((item) => item.label || item.key),
-      axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#4e5c54', width: 105, overflow: 'truncate'}
-    },
-    series: [{
-      type: 'bar', barMaxWidth: 18, data: metrics.map((item, index) => ({
-        value: finiteNumber(item.r2),
-        itemStyle: {color: index === 0 ? '#9ba9a1' : index === metrics.length - 1 ? '#ff7a3d' : '#2d7b5d', borderRadius: [0, 7, 7, 0]}
-      })),
-      label: {show: true, position: 'right', color: '#33453b', formatter: ({value}) => finiteNumber(value).toFixed(3)}
-    }]
-  });
-}
-
-function renderAnalysisLift(data) {
-  const values = [
-    ['Elastic Net', data.incremental_r2?.elastic_net],
-    ['随机森林', data.incremental_r2?.random_forest]
-  ];
-  const maximum = Math.max(...values.map(([, value]) => Math.abs(finiteNumber(value))), .001);
-  analysisUi.liftCards.innerHTML = values.map(([label, value]) => {
-    const number = finiteNumber(value);
-    const width = Math.max(3, Math.abs(number) / maximum * 100);
-    return `<div class="lift-card"><div><span>${escapeHtml(label)}</span><strong>${number >= 0 ? '+' : ''}${formatDecimal(number)}</strong></div><div class="lift-bar" aria-hidden="true"><i style="width:${width.toFixed(1)}%"></i></div></div>`;
-  }).join('');
 }
 
 function signalFor(parameter) {
@@ -331,22 +315,44 @@ function renderParameterCharts(rows) {
     series: [{type: 'bar', barMaxWidth: 15, data: important.map((row) => finiteNumber(row.random_forest_importance)), itemStyle: {color: '#2d7b5d', borderRadius: [0, 6, 6, 0]}}]
   });
 
-  const directionRows = [...rows]
-    .sort((a, b) => Math.abs(finiteNumber(b.spearman_rho)) - Math.abs(finiteNumber(a.spearman_rho)))
-    .slice(0, 18);
-  const maxImportance = Math.max(...directionRows.map((row) => finiteNumber(row.random_forest_importance)), .001);
-  analysisDirectionChart?.dispose();
-  analysisDirectionChart = echarts.init(document.querySelector('#analysis-direction-chart'));
-  analysisDirectionChart.setOption({
-    grid: {left: 136, right: 28, top: 25, bottom: 35},
-    tooltip: {formatter: ({data}) => `<strong>${escapeHtml(data.name)}</strong><br>Spearman ρ ${formatDecimal(data.value[0])}<br>RF 重要度 ${formatDecimal(data.importance, 4)}`},
-    xAxis: {type: 'value', min: -1, max: 1, axisLine: {lineStyle: {color: '#aab4ae'}}, axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
-    yAxis: {type: 'category', inverse: true, data: directionRows.map(parameterLabel), axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 124, overflow: 'truncate'}},
-    series: [{type: 'scatter', data: directionRows.map((row, index) => {
-      const rho = finiteNumber(row.spearman_rho);
-      const importance = finiteNumber(row.random_forest_importance);
-      return {name: parameterLabel(row), value: [rho, index], importance, symbolSize: 8 + 18 * Math.sqrt(importance / maxImportance), itemStyle: {color: rho >= 0 ? '#2d7b5d' : '#ff7a3d', opacity: .82}};
-    }), emphasis: {scale: 1.25}}]
+  const coefficients = [...rows]
+    .sort((a, b) => Math.abs(finiteNumber(b.elastic_net_coefficient)) - Math.abs(finiteNumber(a.elastic_net_coefficient)))
+    .slice(0, 12)
+    .reverse();
+  const maximum = Math.max(...coefficients.map((row) => Math.abs(finiteNumber(row.elastic_net_coefficient))), .001);
+  analysisCoefficientChart?.dispose();
+  analysisCoefficientChart = echarts.init(document.querySelector('#analysis-coefficient-chart'));
+  analysisCoefficientChart.setOption({
+    grid: {left: 132, right: 34, top: 25, bottom: 30},
+    tooltip: {
+      trigger: 'axis', axisPointer: {type: 'shadow'},
+      formatter: (items) => {
+        const item = items[0];
+        return `<strong>${escapeHtml(item?.name || '未命名参数')}</strong><br>Elastic Net 系数 ${formatDecimal(item?.value, 4)}`;
+      }
+    },
+    xAxis: {
+      type: 'value', min: -maximum, max: maximum,
+      axisLine: {show: true, lineStyle: {color: '#aab4ae'}},
+      axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}
+    },
+    yAxis: {
+      type: 'category', data: coefficients.map(parameterLabel),
+      axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 120, overflow: 'truncate'}
+    },
+    series: [{
+      type: 'bar', barMaxWidth: 15,
+      data: coefficients.map((row) => {
+        const value = finiteNumber(row.elastic_net_coefficient);
+        return {
+          value,
+          itemStyle: {
+            color: value >= 0 ? '#2d7b5d' : '#ff7a3d',
+            borderRadius: value >= 0 ? [0, 6, 6, 0] : [6, 0, 0, 6]
+          }
+        };
+      })
+    }]
   });
 }
 
@@ -384,8 +390,6 @@ function renderFilteredAnalysis() {
 function renderAnalysis(data) {
   analysisUi.period.textContent = data.sales_period || '未标注';
   renderAnalysisKpis(data);
-  renderAnalysisModel(data);
-  renderAnalysisLift(data);
 
   const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
   analysisUi.warnings.classList.toggle('is-hidden', warnings.length === 0);
@@ -422,9 +426,8 @@ async function loadAnalysis() {
 analysisUi.filter?.addEventListener('change', renderFilteredAnalysis);
 document.querySelector('#analysis-retry')?.addEventListener('click', loadAnalysis);
 window.addEventListener('resize', () => {
-  analysisModelChart?.resize();
   analysisImportanceChart?.resize();
-  analysisDirectionChart?.resize();
+  analysisCoefficientChart?.resize();
 });
 
 loadAnalysis();

@@ -20,12 +20,8 @@
       <div class="topbar-actions">
         <nav class="view-nav" aria-label="页面功能导航">
           <a href="#recommendation-workspace">消费者选车</a>
-          <a href="#manufacturer-insight">厂商洞察</a>
+          <a href="#data-evidence">数据依据</a>
         </nav>
-        <div class="status-pill" id="system-status">
-          <span class="status-dot"></span>
-          <span>{{ catalog.car_count }} 款车型已就绪</span>
-        </div>
       </div>
     </header>
 
@@ -54,7 +50,7 @@
             <div><b>{{ catalog.brands|length }}</b><span>品牌</span></div>
           </div>
           <div class="spark-line"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <small>价格为数据快照的固定汇率换算，仅用于课程演示</small>
+          <small>价格来自离线数据快照，仅用于课程演示</small>
         </aside>
       </section>
 
@@ -120,6 +116,17 @@
               <option value="7">7 座</option>
             </select>
           </div>
+          <div class="field sales-field">
+            <label for="min_sales">最低月销量</label>
+            <select id="min_sales" name="min_sales">
+              <option value="">不限（包含暂无销量数据）</option>
+              <option value="100">至少 100 辆</option>
+              <option value="500">至少 500 辆</option>
+              <option value="1000">至少 1,000 辆</option>
+              <option value="3000">至少 3,000 辆</option>
+              <option value="5000">至少 5,000 辆</option>
+            </select>
+          </div>
           <div class="form-actions">
             <label class="switch-row" title="未配置或请求失败时自动使用模板说明">
               <input id="use_llm" name="use_llm" type="checkbox" {% if not llm_enabled %}disabled{% endif %}>
@@ -158,7 +165,7 @@
         <div class="comparison-layout">
           <div class="comparison-table-wrap"><table id="comparison-table"></table></div>
           <div class="chart-panel">
-            <div><span>参数相对值</span><small>仅比较已存在字段</small></div>
+            <div><span>六维相对表现</span><small>缺失数据按 0 显示</small></div>
             <div id="comparison-chart" class="chart"></div>
           </div>
         </div>
@@ -175,18 +182,18 @@
         </div>
       </section>
 
-      <section class="manufacturer-insight shell" id="manufacturer-insight" aria-labelledby="analysis-title">
+      <section class="data-evidence shell" id="data-evidence" aria-labelledby="analysis-title">
         <div class="analysis-heading">
           <div>
-            <p class="step-label">PARAMETER INTELLIGENCE / 厂商洞察</p>
-            <h2 id="analysis-title">从全量参数中，识别销量信号。</h2>
+            <p class="step-label">DATA EVIDENCE / 参数分析</p>
+            <h2 id="analysis-title">看清推荐背后的数据依据。</h2>
           </div>
           <div class="analysis-period" aria-label="分析数据期间">
             <span>销量期间</span>
             <strong id="analysis-period">加载中</strong>
           </div>
         </div>
-        <p class="analysis-lead">结合单参数关联、Elastic Net 与随机森林，查看哪些配置与销量表现稳定相关。结果用于产品决策线索，不代表单一参数对销量的因果作用。</p>
+        <p class="analysis-lead">结合参数关联、Elastic Net 与随机森林，了解不同参数在当前数据中的统计表现。分析结果仅用于辅助理解推荐依据，不代表单一参数与销量之间存在因果关系。</p>
 
         <div id="analysis-loading" class="analysis-state" role="status" aria-live="polite">
           <span class="analysis-spinner" aria-hidden="true"></span>
@@ -205,22 +212,11 @@
           <div class="analysis-toolbar">
             <div>
               <p class="analysis-kicker">参数探索器</p>
-              <h3>关联强度与模型贡献</h3>
+              <h3>特征贡献与方向</h3>
             </div>
             <label for="analysis-group-filter">参数分组
               <select id="analysis-group-filter"><option value="">全部分组</option></select>
             </label>
-          </div>
-
-          <div class="analysis-grid analysis-grid-models">
-            <article class="analysis-panel model-panel">
-              <div class="panel-heading"><div><h3>模型解释力</h3><p>R² 越高，模型对销量差异的解释能力越强</p></div><span class="panel-chip">GROUP CV</span></div>
-              <div id="analysis-model-chart" class="analysis-chart" role="img" aria-label="模型 R 平方对比图"></div>
-            </article>
-            <article class="analysis-panel lift-panel">
-              <div class="panel-heading"><div><h3>配置参数增量</h3><p>相对控制变量基线增加的解释力</p></div><span class="panel-chip accent">Δ R²</span></div>
-              <div id="analysis-lift-cards" class="lift-cards"></div>
-            </article>
           </div>
 
           <div class="analysis-grid analysis-grid-charts">
@@ -228,9 +224,9 @@
               <div class="panel-heading"><div><h3>参数重要度 Top 12</h3><p>随机森林中的相对贡献，按当前分组动态排序</p></div></div>
               <div id="analysis-importance-chart" class="analysis-chart analysis-chart-tall" role="img" aria-label="参数重要度水平条形图"></div>
             </article>
-            <article class="analysis-panel direction-panel">
-              <div class="panel-heading"><div><h3>关联方向</h3><p>横轴为 Spearman ρ，点大小表示随机森林重要度</p></div><div class="direction-legend"><span class="positive">正相关</span><span class="negative">负相关</span></div></div>
-              <div id="analysis-direction-chart" class="analysis-chart analysis-chart-tall" role="img" aria-label="参数销量关联方向散点图"></div>
+            <article class="analysis-panel coefficient-panel">
+              <div class="panel-heading"><div><h3>Elastic Net 回归系数</h3><p>正负方向仅用于辅助判断参数关系，不代表因果作用</p></div><div class="direction-legend"><span class="positive">正系数</span><span class="negative">负系数</span></div></div>
+              <div id="analysis-coefficient-chart" class="analysis-chart analysis-chart-tall" role="img" aria-label="Elastic Net 回归系数正负水平条形图"></div>
             </article>
           </div>
 

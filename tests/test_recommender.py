@@ -63,10 +63,20 @@ def test_missing_optional_fields_do_not_block_recommendation(sample_cars):
     assert all("score" in car for car in result["recommendations"])
 
 
+def test_minimum_sales_filters_unknown_and_low_sales_cars(sample_cars):
+    sample_cars[-1]["sales"] = None
+    result = RecommendationEngine(sample_cars).recommend(
+        {**BASE_REQUEST, "min_sales": 500}
+    )
+    assert len(result["recommendations"]) == 3
+    assert all(car["sales"] >= 500 for car in result["recommendations"])
+
+
 def test_compare_accepts_two_or_three_known_cars(sample_cars):
     engine = RecommendationEngine(sample_cars)
     cars = engine.compare(["car_0", "car_1"])
     assert [car["car_id"] for car in cars] == ["car_0", "car_1"]
+    assert [car["sales"] for car in cars] == [1200, 900]
 
     with pytest.raises(RecommendationError) as captured:
         engine.compare(["car_0"])

@@ -43,8 +43,8 @@ RF_MAX_DEPTH = int(os.getenv("RF_MAX_DEPTH", "10"))
 RF_MIN_INSTANCES_PER_NODE = int(os.getenv("RF_MIN_INSTANCES_PER_NODE", "2"))
 
 LEAKAGE_PARAMETERS = {"全国4S最低报价", "车款人气"}
-CATEGORICAL_CONTROLS = ["brand", "level_name", "body_structure"]
-NUMERIC_CONTROLS = ["price_median_wan", "model_year_max", "trim_count", "energy_type"]
+CATEGORICAL_CONTROLS = ["brand", "level_name", "energy_type", "body_structure"]
+NUMERIC_CONTROLS = ["price_median_wan", "model_year_max", "trim_count"]
 
 PARAMETER_SCHEMA = T.StructType(
     [
@@ -100,22 +100,6 @@ SALES_SCHEMA = T.StructType(
 def feature_name(kind: str, parameter_key: str) -> str:
     prefix = "num" if kind == "numeric" else "equip"
     return f"{prefix}_{hashlib.sha1(parameter_key.encode('utf-8')).hexdigest()[:12]}"
-
-
-def encode_energy_type(value: object) -> float | None:
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text:
-        return None
-    lower = text.lower()
-    if any(token in lower for token in ["纯电", "电动", "电驱", "新能源", "ev", "纯电动"]):
-        return 1.0
-    if any(token in lower for token in ["插混", "混动", "增程", "油电", "hev", "phev", "erev"]):
-        return 0.5
-    if any(token in lower for token in ["燃油", "汽油", "柴油", "油气", "内燃"]):
-        return 0.0
-    return None
 
 
 def classify_parameter(row: dict[str, object]) -> str:
@@ -296,10 +280,7 @@ def build_series_features(parameters: DataFrame, mapping: DataFrame) -> DataFram
 def build_controls(parameters: DataFrame, trims: DataFrame) -> DataFrame:
     brand = mode_by_series(parameters.filter(F.col("parameter_name") == "厂商"), "value_text", "brand")
     level = mode_by_series(parameters.filter(F.col("parameter_name") == "级别"), "value_text", "level_name")
-    energy = (
-        mode_by_series(trims, "energy_type_raw", "energy_type")
-        .withColumn("energy_type", F.udf(encode_energy_type, T.DoubleType())(F.col("energy_type")))
-    )
+    energy = mode_by_series(trims, "energy_type_raw", "energy_type")
     body = mode_by_series(trims, "body_structure", "body_structure")
     price = (
         parameters.filter((F.col("parameter_name") == "厂商指导价(元)") & F.col("value_numeric").isNotNull())
@@ -319,97 +300,15 @@ def build_controls(parameters: DataFrame, trims: DataFrame) -> DataFrame:
     )
 
 
-def build_target(
-    sales: DataFrame,
-    controls: DataFrame | None = None,
-    *,
-    history_window: int = 10,
-) -> tuple[str, DataFrame]:
-    """以最近 history_window 期的销量/销售额趋势作为监督学习标签。"""
+def build_target(sales: DataFrame) -> tuple[str, DataFrame]:
+    """使用全表共同最新月份的车系销量，保持横截面分析口径一致。"""
     latest_period = sales.filter(F.col("sales").isNotNull()).agg(F.max("sales_period")).first()[0]
-    power = 0.5
-
-    sales_with_value = sales.filter(F.col("sales").isNotNull() & (F.col("sales") >= 0))
-    if controls is not None:
-        sales_with_value = (
-            sales_with_value.join(
-                controls.select("series_id", "price_median_wan"),
-                "series_id",
-                "left",
-            )
-            .withColumn(
-                "sales_value",
-                F.when(
-                    F.col("price_median_wan").isNotNull(),
-                    F.col("sales") * F.col("price_median_wan"),
-                ).otherwise(F.col("sales")),
-            )
-        )
-    else:
-        sales_with_value = sales_with_value.withColumn("sales_value", F.col("sales"))
-
-    ordered = sales_with_value.withColumn(
-        "sales_period_key",
-        F.regexp_replace(F.col("sales_period"), "[^0-9]", ""),
-    )
-    order_window = Window.partitionBy("series_id").orderBy("sales_period_key", "sales_period")
-    ranked = (
-        ordered.withColumn("period_rank", F.row_number().over(order_window))
-        .withColumn("period_total", F.count("*").over(Window.partitionBy("series_id")))
-    )
-    selected = ranked.withColumn(
-        "history_window",
-        F.least(F.col("period_total"), F.lit(history_window)),
-    ).filter(F.col("period_rank") > F.col("period_total") - F.col("history_window"))
-
-    history_windowed = selected.withColumn(
-        "history_index",
-        F.row_number().over(
-            Window.partitionBy("series_id").orderBy("sales_period_key", "sales_period")
-        ),
-    )
-    latest_value = (
-        history_windowed.withColumn(
-            "latest_history_index",
-            F.max("history_index").over(Window.partitionBy("series_id")),
-        )
-        .withColumn(
-            "latest_sales_value",
-            F.when(
-                F.col("history_index") == F.col("latest_history_index"),
-                F.col("sales_value"),
-            ).otherwise(None),
-        )
-    )
-    
-    aggregated = (
-        latest_value.groupBy("series_id")
-        .agg(
-            F.count("*").alias("history_points"),
-            F.count_distinct("sales_value").alias("distinct_sales_values"),
-            F.sum("sales_value").alias("sum_y"),
-            F.max("latest_sales_value").alias("latest_sales_value"),
-        )
-    )
-    # sales.write.option("delimiter", "\t").option("header", True).csv("test/sales")
-    # latest_value.write.option("delimiter", "\t").option("header", True).csv("test/lastest")
-    # aggregated.write.option("delimiter", "\t").option("header", True).csv("test/aggre")
     target = (
-        aggregated.filter((F.col("history_points") >= 2) & (F.col("distinct_sales_values") > 1))
-        .withColumn(
-            "target_log_sales",
-            F.when(
-                (F.col("history_points") != 0),
-                (
-                    F.col("sum_y")
-                ) / (
-                    F.col("history_points")
-                ),
-            ).otherwise(None),
-        )
-        .select("series_id", "target_log_sales")
-        .filter(F.col("target_log_sales").isNotNull())
-        )
+        sales.filter((F.col("sales_period") == latest_period) & (F.col("sales") >= 0))
+        .groupBy("series_id")
+        .agg(F.max("sales").alias("target_sales"))
+        .withColumn("target_log_sales", F.log1p(F.col("target_sales").cast("double")))
+    )
     return latest_period, target
 
 
@@ -794,6 +693,13 @@ def run(
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
+    parameters: DataFrame | None = None
+    trims: DataFrame | None = None
+    sales: DataFrame | None = None
+    series_features: DataFrame | None = None
+    controls: DataFrame | None = None
+    selected_long: DataFrame | None = None
+    analysis: DataFrame | None = None
     try:
         parameters = (
             spark.read.option("header", True).schema(PARAMETER_SCHEMA).csv(str(input_dir / "trim_parameters.csv.gz"))
@@ -810,7 +716,7 @@ def run(
         quality, mapping = parameter_quality(parameters)
         series_features = build_series_features(parameters, mapping).persist(StorageLevel.MEMORY_AND_DISK)
         controls = build_controls(parameters, trims).persist(StorageLevel.MEMORY_AND_DISK)
-        latest_period, target = build_target(sales, controls)
+        latest_period, target = build_target(sales)
         selected, quality = select_model_features(
             series_features, target, quality,
             minimum_coverage=minimum_coverage, max_features=max_features,
@@ -987,7 +893,7 @@ def run(
         )
         return summary
     finally:
-        for frame in [parameters, trims, sales, series_features, controls, selected_long, analysis]:
+        for frame in (parameters, trims, sales, series_features, controls, selected_long, analysis):
             if frame is not None:
                 frame.unpersist()
         spark.stop()
