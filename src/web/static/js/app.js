@@ -168,7 +168,7 @@ function renderComparison(cars) {
   }
 
   compareChart.setOption({
-    color: ['#1b5e44', '#ff7a3d', '#8da642'],
+    color: ['#1b5e44', '#ff7a3d', '#5572c9'],
     tooltip: {
       trigger: 'item',
       formatter: ({name, value}) => `<strong>${escapeHtml(name)}</strong><br>${dimensions.map((label, index) => `${label} ${formatDecimal(value[index], 1)}`).join('<br>')}`
@@ -187,11 +187,13 @@ function renderComparison(cars) {
       splitArea: {show: true, areaStyle: {color: ['rgba(27,94,68,.015)', 'rgba(27,94,68,.045)']}}
     },
     series: [{
-      type: 'radar', symbolSize: 7, lineStyle: {width: 2},
+      type: 'radar', symbolSize: 7,
+      lineStyle: {width: 2.5, opacity: .92},
+      itemStyle: {borderColor: '#fffef8', borderWidth: 1.5},
       data: cars.map((car) => ({
         name: car.model_name,
         value: radarValues(car),
-        areaStyle: {opacity: .14}
+        areaStyle: {opacity: .08}
       }))
     }]
   });
@@ -219,7 +221,27 @@ function renderCatalogCharts() {
   energyChart.setOption({
     color: ['#1b5e44', '#d8ff63', '#ff7a3d', '#6e9d89', '#b8c5bc'],
     tooltip: {trigger: 'item'},
-    series: [{type: 'pie', radius: ['46%', '72%'], center: ['50%', '48%'], itemStyle: {borderColor: '#f4f4ed', borderWidth: 3, borderRadius: 5}, label: {fontSize: 11, color: '#637068'}, data: window.CATALOG.energy_distribution}]
+    series: [{
+      type: 'pie',
+      radius: ['39%', '61%'],
+      center: ['50%', '50%'],
+      avoidLabelOverlap: true,
+      minShowLabelAngle: 1,
+      itemStyle: {borderColor: '#f4f4ed', borderWidth: 3, borderRadius: 5},
+      label: {
+        show: true,
+        position: 'outside',
+        alignTo: 'edge',
+        edgeDistance: 8,
+        bleedMargin: 2,
+        color: '#637068',
+        fontSize: 11,
+        formatter: '{b}'
+      },
+      labelLine: {show: true, length: 10, length2: 8, smooth: .2},
+      labelLayout: {moveOverlap: 'shiftY'},
+      data: window.CATALOG.energy_distribution
+    }]
   });
   const bodyChart = echarts.init(document.querySelector('#body-chart'));
   const data = [...window.CATALOG.body_distribution].reverse();
