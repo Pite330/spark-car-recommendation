@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-07-10T19:32:44+08:00",
+  "generated_at": "2026-07-13T08:42:38+08:00",
   "spark_version": "4.0.3",
   "data_source": "16888.com 车主之家",
-  "input_file": "data/raw/16888_cars_snapshot.csv",
-  "input_sha256": "30880be0156f2c4c627a99f731cc15921a6f180f5e3c5c6b9cbca8878933ae69",
+  "input_file": "data/raw/16888_full/tables",
+  "input_sha256": "dad474cff51d775a781179b3f8916ded63d27221bd40f6d39e4cef25935c77ba",
   "output_file": "data/processed/cars.csv",
-  "input_rows": 190,
-  "output_rows": 190,
-  "removed_rows": 0
+  "input_rows": 1746,
+  "output_rows": 1744,
+  "removed_rows": 2
 }

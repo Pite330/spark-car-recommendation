@@ -54,7 +54,7 @@ flowchart LR
 ## 4. 数据流
 
 1. `scripts/fetch_16888_dataset.py` 低频读取有限范围的公开车系、参数和销量页面；
-2. 原始快照保存到 `data/raw/16888_cars_snapshot.csv`，不在原文件上修改；
+2. 完整原始表保存到 `data/raw/16888_full/tables/`，不在原文件上修改；
 3. 运行 PySpark 清洗任务；
 4. 任务输出 `data/processed/cars.csv`、`cars.parquet/` 和统计证据；
 5. 推荐模块加载标准数据并执行筛选和评分；
