@@ -37,3 +37,6 @@ data/processed/*
 # Generated reports and screenshots
 output/
 data/processed/_spark_tmp/
+
+# scipts
+scripts/markdown_to_pdf.py
