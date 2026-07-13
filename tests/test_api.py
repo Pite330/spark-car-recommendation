@@ -22,7 +22,7 @@ def test_homepage_uses_data_evidence_without_model_score_panels(dataset_file):
     page = app.test_client().get("/").get_data(as_text=True)
 
     assert "数据依据" in page
-    assert 'id="analysis-coefficient-chart"' in page
+    assert 'id="analysis-parameter-chart"' in page
     assert 'name="min_sales"' in page
     assert "190 款车型已就绪" not in page
     assert "模型解释力" not in page

@@ -270,8 +270,7 @@ const analysisUi = {
   tableCaption: document.querySelector('#analysis-table-caption')
 };
 let analysisData = null;
-let analysisImportanceChart = null;
-let analysisCoefficientChart = null;
+let analysisParameterChart = null;
 
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);
@@ -324,57 +323,69 @@ function signalFor(parameter) {
 
 function renderParameterCharts(rows) {
   if (!window.echarts) return;
-  const important = [...rows]
+  const alignedRows = [...rows]
     .sort((a, b) => finiteNumber(b.random_forest_importance) - finiteNumber(a.random_forest_importance))
     .slice(0, 12).reverse();
-  analysisImportanceChart?.dispose();
-  analysisImportanceChart = echarts.init(document.querySelector('#analysis-importance-chart'));
-  analysisImportanceChart.setOption({
-    grid: {left: 132, right: 34, top: 25, bottom: 30},
-    tooltip: {trigger: 'axis', axisPointer: {type: 'shadow'}, valueFormatter: (value) => formatDecimal(value, 4)},
-    xAxis: {type: 'value', axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}},
-    yAxis: {type: 'category', data: important.map(parameterLabel), axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 120, overflow: 'truncate'}},
-    series: [{type: 'bar', barMaxWidth: 15, data: important.map((row) => finiteNumber(row.random_forest_importance)), itemStyle: {color: '#2d7b5d', borderRadius: [0, 6, 6, 0]}}]
-  });
-
-  const coefficients = [...rows]
-    .sort((a, b) => Math.abs(finiteNumber(b.elastic_net_coefficient)) - Math.abs(finiteNumber(a.elastic_net_coefficient)))
-    .slice(0, 12)
-    .reverse();
-  const maximum = Math.max(...coefficients.map((row) => Math.abs(finiteNumber(row.elastic_net_coefficient))), .001);
-  analysisCoefficientChart?.dispose();
-  analysisCoefficientChart = echarts.init(document.querySelector('#analysis-coefficient-chart'));
-  analysisCoefficientChart.setOption({
-    grid: {left: 132, right: 34, top: 25, bottom: 30},
+  const labels = alignedRows.map(parameterLabel);
+  const maximumCoefficient = Math.max(...alignedRows.map((row) => Math.abs(finiteNumber(row.elastic_net_coefficient))), .001);
+  const rowArea = {show: true, areaStyle: {color: ['rgba(45,123,93,.035)', 'rgba(255,255,255,0)']}};
+  analysisParameterChart?.dispose();
+  analysisParameterChart = echarts.init(document.querySelector('#analysis-parameter-chart'));
+  analysisParameterChart.setOption({
     tooltip: {
-      trigger: 'axis', axisPointer: {type: 'shadow'},
-      formatter: (items) => {
-        const item = items[0];
-        return `<strong>${escapeHtml(item?.name || '未命名参数')}</strong><br>Elastic Net 系数 ${formatDecimal(item?.value, 4)}`;
+      trigger: 'item',
+      formatter: ({dataIndex}) => {
+        const row = alignedRows[dataIndex];
+        return `<strong>${escapeHtml(parameterLabel(row))}</strong><br>随机森林重要度 ${formatDecimal(row.random_forest_importance, 4)}<br>Elastic Net 系数 ${formatDecimal(row.elastic_net_coefficient, 4)}`;
       }
     },
-    xAxis: {
-      type: 'value', min: -maximum, max: maximum,
-      axisLine: {show: true, lineStyle: {color: '#aab4ae'}},
-      axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}
-    },
-    yAxis: {
-      type: 'category', data: coefficients.map(parameterLabel),
-      axisLine: {show: false}, axisTick: {show: false}, axisLabel: {color: '#526058', width: 120, overflow: 'truncate'}
-    },
-    series: [{
-      type: 'bar', barMaxWidth: 15,
-      data: coefficients.map((row) => {
-        const value = finiteNumber(row.elastic_net_coefficient);
-        return {
-          value,
-          itemStyle: {
-            color: value >= 0 ? '#2d7b5d' : '#ff7a3d',
-            borderRadius: value >= 0 ? [0, 6, 6, 0] : [6, 0, 0, 6]
-          }
-        };
-      })
-    }]
+    grid: [
+      {left: 165, right: '55%', top: 18, bottom: 34},
+      {left: '55%', right: 34, top: 18, bottom: 34}
+    ],
+    xAxis: [
+      {
+        type: 'value', gridIndex: 0, min: 0,
+        axisLabel: {color: '#7d8881'}, axisLine: {show: false},
+        splitLine: {lineStyle: {color: '#e2e5df'}}
+      },
+      {
+        type: 'value', gridIndex: 1, min: -maximumCoefficient, max: maximumCoefficient,
+        axisLine: {show: true, lineStyle: {color: '#aab4ae'}},
+        axisLabel: {color: '#7d8881'}, splitLine: {lineStyle: {color: '#e2e5df'}}
+      }
+    ],
+    yAxis: [
+      {
+        type: 'category', gridIndex: 0, data: labels,
+        axisLine: {show: false}, axisTick: {show: false},
+        axisLabel: {color: '#526058', width: 150, overflow: 'truncate'}, splitArea: rowArea
+      },
+      {
+        type: 'category', gridIndex: 1, data: labels,
+        axisLine: {show: false}, axisTick: {show: false}, axisLabel: {show: false}, splitArea: rowArea
+      }
+    ],
+    series: [
+      {
+        name: '随机森林重要度', type: 'bar', xAxisIndex: 0, yAxisIndex: 0, barMaxWidth: 15,
+        data: alignedRows.map((row) => finiteNumber(row.random_forest_importance)),
+        itemStyle: {color: '#2d7b5d', borderRadius: [0, 6, 6, 0]}
+      },
+      {
+        name: 'Elastic Net 系数', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, barMaxWidth: 15,
+        data: alignedRows.map((row) => {
+          const value = finiteNumber(row.elastic_net_coefficient);
+          return {
+            value,
+            itemStyle: {
+              color: value >= 0 ? '#2d7b5d' : '#ff7a3d',
+              borderRadius: value >= 0 ? [0, 6, 6, 0] : [6, 0, 0, 6]
+            }
+          };
+        })
+      }
+    ]
   });
 }
 
@@ -448,8 +459,7 @@ async function loadAnalysis() {
 analysisUi.filter?.addEventListener('change', renderFilteredAnalysis);
 document.querySelector('#analysis-retry')?.addEventListener('click', loadAnalysis);
 window.addEventListener('resize', () => {
-  analysisImportanceChart?.resize();
-  analysisCoefficientChart?.resize();
+  analysisParameterChart?.resize();
 });
 
 loadAnalysis();

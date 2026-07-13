@@ -219,16 +219,16 @@
             </label>
           </div>
 
-          <div class="analysis-grid analysis-grid-charts">
-            <article class="analysis-panel importance-panel">
-              <div class="panel-heading"><div><h3>参数重要度 Top 12</h3><p>随机森林中的相对贡献，按当前分组动态排序</p></div></div>
-              <div id="analysis-importance-chart" class="analysis-chart analysis-chart-tall" role="img" aria-label="参数重要度水平条形图"></div>
-            </article>
-            <article class="analysis-panel coefficient-panel">
-              <div class="panel-heading"><div><h3>Elastic Net 回归系数</h3><p>正负方向仅用于辅助判断参数关系，不代表因果作用</p></div><div class="direction-legend"><span class="positive">正系数</span><span class="negative">负系数</span></div></div>
-              <div id="analysis-coefficient-chart" class="analysis-chart analysis-chart-tall" role="img" aria-label="Elastic Net 回归系数正负水平条形图"></div>
-            </article>
-          </div>
+          <article class="analysis-panel analysis-paired-panel">
+            <div class="panel-heading">
+              <div><h3>参数重要度与回归方向</h3><p>按随机森林重要度选取 Top 12；同一水平行展示同一参数的 Elastic Net 系数，不再按系数二次排序</p></div>
+              <div class="direction-legend"><span class="positive">正系数</span><span class="negative">负系数</span></div>
+            </div>
+            <div class="analysis-chart-viewport">
+              <div class="paired-axis-labels" aria-hidden="true"><span>随机森林重要度</span><span>Elastic Net 系数</span></div>
+              <div id="analysis-parameter-chart" class="analysis-chart analysis-chart-paired" role="img" aria-label="按参数对齐的随机森林重要度与 Elastic Net 回归系数图"></div>
+            </div>
+          </article>
 
           <article class="analysis-panel analysis-table-panel">
             <div class="panel-heading"><div><h3>全量参数证据明细</h3><p id="analysis-table-caption">187 项来源参数，按随机森林重要度排序</p></div><span class="panel-chip" id="analysis-result-count">0 项</span></div>
