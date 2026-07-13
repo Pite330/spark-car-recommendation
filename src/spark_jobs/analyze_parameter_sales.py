@@ -24,14 +24,27 @@ from pyspark.ml.regression import LinearRegression, RandomForestRegressor
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 from pyspark.sql import types as T
+from pyspark import StorageLevel
 
 
 DEFAULT_INPUT_DIR = Path("data/raw/16888_full/tables")
 DEFAULT_OUTPUT_DIR = Path("data/processed/analysis")
 
+SPARK_LOCAL_CORES = int(os.getenv("SPARK_LOCAL_CORES", "2"))
+SPARK_DRIVER_MEMORY = os.getenv("SPARK_DRIVER_MEMORY", "2g")
+SPARK_EXECUTOR_MEMORY = os.getenv("SPARK_EXECUTOR_MEMORY", "2g")
+SPARK_DRIVER_MAX_RESULT_SIZE = os.getenv("SPARK_DRIVER_MAX_RESULT_SIZE", "1g")
+SPARK_SHUFFLE_PARTITIONS = int(os.getenv("SPARK_SHUFFLE_PARTITIONS", "4"))
+SPARK_DEFAULT_PARALLELISM = int(os.getenv("SPARK_DEFAULT_PARALLELISM", "4"))
+SPARK_MEMORY_FRACTION = os.getenv("SPARK_MEMORY_FRACTION", "0.6")
+SPARK_MEMORY_STORAGE_FRACTION = os.getenv("SPARK_MEMORY_STORAGE_FRACTION", "0.3")
+RF_NUM_TREES = int(os.getenv("RF_NUM_TREES", "70"))
+RF_MAX_DEPTH = int(os.getenv("RF_MAX_DEPTH", "13"))
+RF_MIN_INSTANCES_PER_NODE = int(os.getenv("RF_MIN_INSTANCES_PER_NODE", "2"))
+
 LEAKAGE_PARAMETERS = {"全国4S最低报价", "车款人气"}
-CATEGORICAL_CONTROLS = ["brand", "level_name", "energy_type", "body_structure"]
-NUMERIC_CONTROLS = ["price_median_wan", "model_year_max", "trim_count"]
+CATEGORICAL_CONTROLS = ["brand", "level_name", "body_structure"]
+NUMERIC_CONTROLS = ["price_median_wan", "model_year_max", "trim_count", "energy_type"]
 
 PARAMETER_SCHEMA = T.StructType(
     [
@@ -87,6 +100,22 @@ SALES_SCHEMA = T.StructType(
 def feature_name(kind: str, parameter_key: str) -> str:
     prefix = "num" if kind == "numeric" else "equip"
     return f"{prefix}_{hashlib.sha1(parameter_key.encode('utf-8')).hexdigest()[:12]}"
+
+
+def encode_energy_type(value: object) -> float | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    lower = text.lower()
+    if any(token in lower for token in ["纯电", "电动", "电驱", "新能源", "ev", "纯电动"]):
+        return 1.0
+    if any(token in lower for token in ["插混", "混动", "增程", "油电", "hev", "phev", "erev"]):
+        return 0.5
+    if any(token in lower for token in ["燃油", "汽油", "柴油", "油气", "内燃"]):
+        return 0.0
+    return None
 
 
 def classify_parameter(row: dict[str, object]) -> str:
@@ -161,6 +190,11 @@ def write_csv(path: Path, rows: Iterable[dict[str, object]], fieldnames: list[st
         writer.writeheader()
         writer.writerows(rows)
     temporary.replace(path)
+
+
+def write_json(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def mode_by_series(frame: DataFrame, value_column: str, alias: str) -> DataFrame:
@@ -262,7 +296,10 @@ def build_series_features(parameters: DataFrame, mapping: DataFrame) -> DataFram
 def build_controls(parameters: DataFrame, trims: DataFrame) -> DataFrame:
     brand = mode_by_series(parameters.filter(F.col("parameter_name") == "厂商"), "value_text", "brand")
     level = mode_by_series(parameters.filter(F.col("parameter_name") == "级别"), "value_text", "level_name")
-    energy = mode_by_series(trims, "energy_type_raw", "energy_type")
+    energy = (
+        mode_by_series(trims, "energy_type_raw", "energy_type")
+        .withColumn("energy_type", F.udf(encode_energy_type, T.DoubleType())(F.col("energy_type")))
+    )
     body = mode_by_series(trims, "body_structure", "body_structure")
     price = (
         parameters.filter((F.col("parameter_name") == "厂商指导价(元)") & F.col("value_numeric").isNotNull())
@@ -282,13 +319,102 @@ def build_controls(parameters: DataFrame, trims: DataFrame) -> DataFrame:
     )
 
 
-def build_target(sales: DataFrame) -> tuple[str, DataFrame]:
+def build_target(
+    sales: DataFrame,
+    controls: DataFrame | None = None,
+    *,
+    history_window: int = 10,
+) -> tuple[str, DataFrame]:
+    """以最近 history_window 期的销量/销售额趋势作为监督学习标签。"""
     latest_period = sales.filter(F.col("sales").isNotNull()).agg(F.max("sales_period")).first()[0]
+    power = 0.5
+
+    sales_with_value = sales.filter(F.col("sales").isNotNull() & (F.col("sales") >= 0))
+    if controls is not None:
+        sales_with_value = (
+            sales_with_value.join(
+                controls.select("series_id", "price_median_wan"),
+                "series_id",
+                "left",
+            )
+            .withColumn(
+                "sales_value",
+                F.when(
+                    F.col("price_median_wan").isNotNull(),
+                    F.col("sales") * F.col("price_median_wan"),
+                ).otherwise(F.col("sales")),
+            )
+        )
+    else:
+        sales_with_value = sales_with_value.withColumn("sales_value", F.col("sales"))
+
+    ordered = sales_with_value.withColumn(
+        "sales_period_key",
+        F.regexp_replace(F.col("sales_period"), "[^0-9]", ""),
+    )
+    order_window = Window.partitionBy("series_id").orderBy("sales_period_key", "sales_period")
+    ranked = (
+        ordered.withColumn("period_rank", F.row_number().over(order_window))
+        .withColumn("period_total", F.count("*").over(Window.partitionBy("series_id")))
+    )
+    selected = ranked.withColumn(
+        "history_window",
+        F.least(F.col("period_total"), F.lit(history_window)),
+    ).filter(F.col("period_rank") > F.col("period_total") - F.col("history_window"))
+
+    history_windowed = selected.withColumn(
+        "history_index",
+        F.row_number().over(
+            Window.partitionBy("series_id").orderBy("sales_period_key", "sales_period")
+        ),
+    )
+    latest_value = (
+        history_windowed.withColumn(
+            "latest_history_index",
+            F.max("history_index").over(Window.partitionBy("series_id")),
+        )
+        .withColumn(
+            "latest_sales_value",
+            F.when(
+                F.col("history_index") == F.col("latest_history_index"),
+                F.col("sales_value"),
+            ).otherwise(None),
+        )
+    )
+    aggregated = (
+        latest_value.groupBy("series_id")
+        .agg(
+            F.count("*").alias("history_points"),
+            F.count_distinct("sales_value").alias("distinct_sales_values"),
+            F.sum(F.col("history_index") - 1).alias("sum_x"),
+            F.sum("sales_value").alias("sum_y"),
+            F.sum((F.col("history_index") - 1) * F.col("sales_value")).alias("sum_xy"),
+            F.sum((F.col("history_index") - 1) * (F.col("history_index") - 1)).alias("sum_xx"),
+            F.max("latest_sales_value").alias("latest_sales_value"),
+        )
+    )
     target = (
-        sales.filter((F.col("sales_period") == latest_period) & (F.col("sales") >= 0))
-        .groupBy("series_id")
-        .agg(F.max("sales").alias("target_sales"))
-        .withColumn("target_log_sales", F.log1p(F.col("target_sales").cast("double")))
+        aggregated.filter((F.col("history_points") >= 2) & (F.col("distinct_sales_values") > 1))
+        .withColumn(
+            "slope",
+            F.when(
+                (F.col("history_points") * F.col("sum_xx") - F.col("sum_x") * F.col("sum_x")) != 0,
+                (
+                    F.col("history_points") * F.col("sum_xy") - F.col("sum_x") * F.col("sum_y")
+                ) / (
+                    F.col("history_points") * F.col("sum_xx") - F.col("sum_x") * F.col("sum_x")
+                ),
+            ).otherwise(None),
+        )
+        .withColumn(
+            "target_log_sales",
+            F.when(
+                F.col("slope").isNotNull() & F.col("latest_sales_value").isNotNull(),
+                F.col("slope") * F.pow(F.col("latest_sales_value").cast("double"), F.lit(power)),
+            ).otherwise(None),
+        )
+        .select("series_id", "target_log_sales")
+        .filter(F.col("target_log_sales").isNotNull())
     )
     return latest_period, target
 
@@ -396,8 +522,9 @@ def evaluate_models(analysis: DataFrame, feature_columns: list[str], folds: int)
         "full_random_forest": (
             feature_columns,
             lambda: RandomForestRegressor(
-                labelCol="target_log_sales", predictionCol="prediction", numTrees=80,
-                maxDepth=6, minInstancesPerNode=5, seed=20260711,
+                labelCol="target_log_sales", predictionCol="prediction",
+                numTrees=RF_NUM_TREES, maxDepth=RF_MAX_DEPTH,
+                minInstancesPerNode=RF_MIN_INSTANCES_PER_NODE, seed=19191,
             ),
         ),
     }
@@ -418,19 +545,51 @@ def evaluate_models(analysis: DataFrame, feature_columns: list[str], folds: int)
             model = pipeline_for(
                 columns, factory(), scale_features=model_name.endswith("elastic_net")
             ).fit(train)
-            predictions = model.transform(test)
-            fold_results.append(
-                {"fold": fold, **{name: evaluator.evaluate(predictions) for name, evaluator in evaluators.items()}}
-            )
-        results[model_name] = {
+            train_predictions = model.transform(train)
+            test_predictions = model.transform(test)
+            fold_result: dict[str, object] = {"fold": fold}
+            for metric_name in ["rmse", "mae", "r2"]:
+                evaluator = evaluators[metric_name]
+                fold_result[f"train_{metric_name}"] = round(float(evaluator.evaluate(train_predictions)), 6)
+                fold_result[f"test_{metric_name}"] = round(float(evaluator.evaluate(test_predictions)), 6)
+            fold_results.append(fold_result)
+        summary: dict[str, object] = {
             "folds": fold_results,
             "mean": {
-                metric: round(mean(row[metric] for row in fold_results), 6)
-                for metric in evaluators
+                "train_rmse": round(mean(row["train_rmse"] for row in fold_results), 6),
+                "train_mae": round(mean(row["train_mae"] for row in fold_results), 6),
+                "train_r2": round(mean(row["train_r2"] for row in fold_results), 6),
+                "test_rmse": round(mean(row["test_rmse"] for row in fold_results), 6),
+                "test_mae": round(mean(row["test_mae"] for row in fold_results), 6),
+                "test_r2": round(mean(row["test_r2"] for row in fold_results), 6),
+                "rmse": round(mean(row["test_rmse"] for row in fold_results), 6),
+                "mae": round(mean(row["test_mae"] for row in fold_results), 6),
+                "r2": round(mean(row["test_r2"] for row in fold_results), 6),
             },
         }
+        if model_name == "full_random_forest":
+            fitted_for_params = pipeline_for(columns, factory(), scale_features=False).fit(analysis)
+            estimator_model = fitted_for_params.stages[-1]
+            summary["hyperparameters"] = {
+                "labelCol": "target_log_sales",
+                "predictionCol": "prediction",
+            }
+        results[model_name] = summary
 
     importance: dict[str, dict[str, float]] = defaultdict(dict)
+    relevant_names = set(feature_columns) | set(CATEGORICAL_CONTROLS) | set(NUMERIC_CONTROLS)
+
+    def normalize_feature_name(name: str) -> str | None:
+        if name in relevant_names:
+            return name
+        for control_name in CATEGORICAL_CONTROLS:
+            if name == control_name or name.startswith(f"{control_name}_"):
+                return control_name
+        for control_name in NUMERIC_CONTROLS:
+            if name == control_name or name.startswith(f"{control_name}_"):
+                return control_name
+        return None
+
     for model_name, factory in [
         ("elastic_net", specs["full_elastic_net"][1]),
         ("random_forest", specs["full_random_forest"][1]),
@@ -452,8 +611,11 @@ def evaluate_models(analysis: DataFrame, feature_columns: list[str], folds: int)
             else estimator_model.featureImportances.toArray().tolist()
         )
         for name, value in zip(names, values):
-            if name in feature_columns:
-                importance[name][model_name] = float(value)
+            target_name = normalize_feature_name(name)
+            if target_name is None:
+                continue
+            if target_name in relevant_names:
+                importance[target_name][model_name] = importance[target_name].get(model_name, 0.0) + float(value)
     return results, importance
 
 
@@ -551,7 +713,12 @@ def consolidated_parameter_results(
     return sorted(results, key=lambda row: (str(row["group_name"]), str(row["parameter_name"])))
 
 
-def univariate_associations(series_features: DataFrame, target: DataFrame) -> list[dict[str, object]]:
+def univariate_associations(
+    series_features: DataFrame,
+    target: DataFrame,
+    controls: DataFrame | None = None,
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
     joined = (
         series_features.join(target.select("series_id", "target_log_sales"), "series_id", "inner")
         .select("feature_name", "feature_value", "target_log_sales")
@@ -561,10 +728,39 @@ def univariate_associations(series_features: DataFrame, target: DataFrame) -> li
     for row in joined:
         grouped[row["feature_name"]][0].append(float(row["feature_value"]))
         grouped[row["feature_name"]][1].append(float(row["target_log_sales"]))
-    rows: list[dict[str, object]] = []
     for name, (values, targets) in grouped.items():
         rho, p_value = spearman(values, targets)
         rows.append({"feature_name": name, "n": len(values), "spearman_rho": rho, "p_value": p_value})
+
+    if controls is not None:
+        target_with_controls = target.join(controls, "series_id", "inner")
+        for column in NUMERIC_CONTROLS:
+            values = target_with_controls.select(column, "target_log_sales").collect()
+            if not values:
+                continue
+            numeric_values: list[float] = []
+            target_values: list[float] = []
+            for row in values:
+                candidate = row[column]
+                if candidate is None:
+                    continue
+                try:
+                    numeric = float(candidate)
+                except (TypeError, ValueError):
+                    continue
+                numeric_values.append(numeric)
+                target_values.append(float(row["target_log_sales"]))
+            if len(numeric_values) >= 3 and len(numeric_values) == len(target_values):
+                rho, p_value = spearman(numeric_values, target_values)
+                rows.append(
+                    {
+                        "feature_name": column,
+                        "n": len(numeric_values),
+                        "spearman_rho": rho,
+                        "p_value": p_value,
+                    }
+                )
+
     adjusted = benjamini_hochberg([float(row["p_value"]) for row in rows])
     for row, q_value in zip(rows, adjusted):
         row["fdr_q_value"] = q_value
@@ -590,42 +786,111 @@ def run(
     if missing:
         raise FileNotFoundError(f"缺少完整参数分析输入：{', '.join(missing)}")
     spark = (
-        SparkSession.builder.master("local[4]")
+        SparkSession.builder.master(f"local[{SPARK_LOCAL_CORES}]")
         .appName("spark-car-parameter-sales-analysis")
+        .config("spark.driver.memory", SPARK_DRIVER_MEMORY)
+        .config("spark.executor.memory", SPARK_EXECUTOR_MEMORY)
+        .config("spark.driver.maxResultSize", SPARK_DRIVER_MAX_RESULT_SIZE)
+        .config("spark.default.parallelism", str(SPARK_DEFAULT_PARALLELISM))
+        .config("spark.sql.shuffle.partitions", str(SPARK_SHUFFLE_PARTITIONS))
+        .config("spark.memory.fraction", SPARK_MEMORY_FRACTION)
+        .config("spark.memory.storageFraction", SPARK_MEMORY_STORAGE_FRACTION)
         .config("spark.sql.session.timeZone", "Asia/Shanghai")
         .config("spark.ui.enabled", "false")
-        .config("spark.sql.shuffle.partitions", "16")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("WARN")
     try:
-        parameters = spark.read.option("header", True).schema(PARAMETER_SCHEMA).csv(str(input_dir / "trim_parameters.csv.gz")).cache()
-        trims = spark.read.option("header", True).schema(TRIM_SCHEMA).csv(str(input_dir / "trims.csv")).cache()
-        sales = spark.read.option("header", True).schema(SALES_SCHEMA).csv(str(input_dir / "series_month_sales.csv")).cache()
+        parameters = (
+            spark.read.option("header", True).schema(PARAMETER_SCHEMA).csv(str(input_dir / "trim_parameters.csv.gz"))
+            .persist(StorageLevel.MEMORY_AND_DISK)
+        )
+        trims = (
+            spark.read.option("header", True).schema(TRIM_SCHEMA).csv(str(input_dir / "trims.csv"))
+            .persist(StorageLevel.MEMORY_AND_DISK)
+        )
+        sales = (
+            spark.read.option("header", True).schema(SALES_SCHEMA).csv(str(input_dir / "series_month_sales.csv"))
+            .persist(StorageLevel.MEMORY_AND_DISK)
+        )
 
         quality, mapping = parameter_quality(parameters)
-        series_features = build_series_features(parameters, mapping).cache()
-        controls = build_controls(parameters, trims).cache()
-        latest_period, target = build_target(sales)
+        series_features = build_series_features(parameters, mapping).persist(StorageLevel.MEMORY_AND_DISK)
+        controls = build_controls(parameters, trims).persist(StorageLevel.MEMORY_AND_DISK)
+        latest_period, target = build_target(sales, controls)
         selected, quality = select_model_features(
             series_features, target, quality,
             minimum_coverage=minimum_coverage, max_features=max_features,
         )
-        selected_long = series_features.filter(F.col("feature_name").isin(selected)).cache()
-        analysis = build_analysis_dataset(selected_long, controls, target, selected).cache()
+        selected_long = series_features.filter(F.col("feature_name").isin(selected)).persist(StorageLevel.MEMORY_AND_DISK)
+        analysis = build_analysis_dataset(selected_long, controls, target, selected).persist(StorageLevel.MEMORY_AND_DISK)
 
-        associations = univariate_associations(selected_long, target)
+        associations = univariate_associations(selected_long, target, controls)
         metrics, importance = evaluate_models(analysis, selected, folds)
-        quality_by_feature = {str(row["feature_name"]): row for row in quality if row["feature_name"]}
-        for association in associations:
-            source = quality_by_feature[str(association["feature_name"])]
-            association.update(
+        random_forest_diagnostics = {
+            "model_type": "RandomForestRegressor",
+            "hyperparameters": metrics.get("full_random_forest", {}).get("hyperparameters", {}),
+            "fold_metrics": metrics.get("full_random_forest", {}).get("folds", []),
+            "mean_metrics": metrics.get("full_random_forest", {}).get("mean", {}),
+            "notes": "每个 fold 都先用训练集拟合，再用测试集评估，并同时保存训练集与测试集的 RMSE/MAE/R²。",
+        }
+        write_json(output_dir / "random_forest_model_diagnostics.json", random_forest_diagnostics)
+        write_csv(
+            output_dir / "random_forest_model_diagnostics.csv",
+            [
                 {
-                    "group_name": source["group_name"],
-                    "parameter_name": source["parameter_name"],
-                    "parameter_type": source["parameter_type"],
+                    "fold": row.get("fold"),
+                    "train_rmse": row.get("train_rmse"),
+                    "test_rmse": row.get("test_rmse"),
+                    "train_mae": row.get("train_mae"),
+                    "test_mae": row.get("test_mae"),
+                    "train_r2": row.get("train_r2"),
+                    "test_r2": row.get("test_r2"),
                 }
-            )
+                for row in metrics.get("full_random_forest", {}).get("folds", [])
+            ],
+            ["fold", "train_rmse", "test_rmse", "train_mae", "test_mae", "train_r2", "test_r2"],
+        )
+        quality_by_feature = {str(row["feature_name"]): row for row in quality if row["feature_name"]}
+        control_name_map = {
+            "brand": "品牌",
+            "level_name": "级别",
+            "energy_type": "能源类型",
+            "body_structure": "车身结构",
+            "price_median_wan": "指导价格",
+            "model_year_max": "车型年份上限",
+            "trim_count": "车款数量",
+        }
+        control_quality_rows = [
+            {
+                "feature_name": name,
+                "group_name": "control",
+                "parameter_name": control_name_map.get(name, name),
+                "parameter_type": "control",
+                "selected_for_model": True,
+                "excluded_reason": "control_only",
+            }
+            for name in CATEGORICAL_CONTROLS + NUMERIC_CONTROLS
+        ]
+        for association in associations:
+            feature_name = str(association["feature_name"])
+            if feature_name in quality_by_feature:
+                source = quality_by_feature[feature_name]
+                association.update(
+                    {
+                        "group_name": source["group_name"],
+                        "parameter_name": source["parameter_name"],
+                        "parameter_type": source["parameter_type"],
+                    }
+                )
+            elif feature_name in control_name_map:
+                association.update(
+                    {
+                        "group_name": "control",
+                        "parameter_name": control_name_map[feature_name],
+                        "parameter_type": "control",
+                    }
+                )
         importance_rows = []
         for name in selected:
             source = quality_by_feature[name]
@@ -639,8 +904,23 @@ def run(
                     "random_forest_importance": importance.get(name, {}).get("random_forest", 0.0),
                 }
             )
+        for name in CATEGORICAL_CONTROLS + NUMERIC_CONTROLS:
+            importance_rows.append(
+                {
+                    "feature_name": name,
+                    "group_name": "control",
+                    "parameter_name": name,
+                    "parameter_type": "control",
+                    "elastic_net_coefficient": importance.get(name, {}).get("elastic_net", 0.0),
+                    "random_forest_importance": importance.get(name, {}).get("random_forest", 0.0),
+                }
+            )
         importance_rows.sort(key=lambda row: float(row["random_forest_importance"]), reverse=True)
-        consolidated_rows = consolidated_parameter_results(quality, associations, importance_rows)
+        consolidated_rows = consolidated_parameter_results(
+            quality + control_quality_rows,
+            associations,
+            importance_rows,
+        )
 
         output_dir.mkdir(parents=True, exist_ok=True)
         write_parquet(selected_long, output_dir / "series_features.parquet")
@@ -685,6 +965,7 @@ def run(
             "brand_grouped_folds": folds,
             "excluded_leakage_parameters": sorted(LEAKAGE_PARAMETERS),
             "model_metrics": metrics,
+            "random_forest_diagnostics": random_forest_diagnostics,
             "incremental_mean_r2": {
                 "elastic_net": round(
                     metrics["full_elastic_net"]["mean"]["r2"]
@@ -713,6 +994,9 @@ def run(
         )
         return summary
     finally:
+        for frame in [parameters, trims, sales, series_features, controls, selected_long, analysis]:
+            if frame is not None:
+                frame.unpersist()
         spark.stop()
 
 

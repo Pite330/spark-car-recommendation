@@ -7,6 +7,7 @@ from src.spark_jobs.analyze_parameter_sales import (
     benjamini_hochberg,
     classify_parameter,
     consolidated_parameter_results,
+    encode_energy_type,
     feature_name,
     spearman,
     summarize_evidence,
@@ -51,6 +52,13 @@ def test_benjamini_hochberg_is_monotonic_in_sorted_order():
     adjusted = benjamini_hochberg([0.01, 0.04, 0.03, float("nan")])
     assert adjusted[:3] == [0.03, 0.04, 0.04]
     assert math.isnan(adjusted[3])
+
+
+def test_energy_type_mapping_uses_ordered_numeric_values():
+    assert encode_energy_type("纯电") == 1.0
+    assert encode_energy_type("插混") == 0.5
+    assert encode_energy_type("燃油") == 0.0
+    assert encode_energy_type(None) is None
 
 
 def test_evidence_summary_requires_adjusted_signal_and_direction_agreement():
