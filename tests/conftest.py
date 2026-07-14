@@ -24,6 +24,7 @@ def sample_cars():
             "model_year": 2025,
             "sales": [1200, 900, 600, 300, 100][index],
             "sales_period": "2026-06",
+            "trim_count": 3 + index,
             "normalized_heat": None,
             "scenario_tags": ["城市通勤", "家庭出行"],
             "data_completeness": 1.0,

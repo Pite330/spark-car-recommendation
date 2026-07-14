@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="基于 Spark 数据处理与确定性评分的轻量购车推荐系统">
-    <title>选车罗盘 · Spark 汽车推荐</title>
+    <meta name="description" content="按预算和偏好筛选车型，查看评分依据、参数对比和 Spark 数据统计">
+    <title>车型筛选 · Spark 数据推荐</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
     <script src="{{ url_for('static', filename='vendor/echarts.min.js') }}"></script>
@@ -15,11 +15,11 @@
     <header class="topbar shell">
       <a class="brand" href="#top" aria-label="返回顶部">
         <span class="brand-mark">↗</span>
-        <span>选车罗盘</span>
+        <span>车型筛选</span>
       </a>
       <div class="topbar-actions">
         <nav class="view-nav" aria-label="页面功能导航">
-          <a href="#recommendation-workspace">消费者选车</a>
+          <a href="#recommendation-workspace">筛选车型</a>
           <a href="#data-evidence">数据依据</a>
         </nav>
       </div>
@@ -28,13 +28,13 @@
     <main id="top">
       <section class="hero shell">
         <div class="hero-copy">
-          <p class="eyebrow">SPARK-POWERED · DETERMINISTIC</p>
-          <h1>把复杂参数，<br><span>变成清晰选择。</span></h1>
-          <p class="hero-lead">输入真实预算和少量偏好，系统会从 Spark 清洗后的公开车型快照中，给出可复现、能解释的 3—5 款候选。</p>
+          <p class="eyebrow">SPARK DATA · RULE-BASED</p>
+          <h1>输入条件，<br><span>查看候选车型。</span></h1>
+          <p class="hero-lead">系统按预算和偏好执行硬筛选与加权评分，返回 3—5 款车型。相同输入得到相同结果。</p>
           <div class="trust-row">
-            <span>✓ 无需登录</span>
-            <span>✓ 规则透明</span>
-            <span>✓ 大模型可关闭</span>
+            <span>无需登录</span>
+            <span>固定规则</span>
+            <span>支持离线</span>
           </div>
         </div>
         <aside class="data-card">
@@ -43,14 +43,14 @@
             <span class="live-label">LOCAL DATA</span>
           </div>
           <strong>{{ catalog.car_count }}</strong>
-          <p>款公开车型快照</p>
+          <p>条车型记录</p>
           <div class="mini-metrics">
             <div><b>{{ catalog.energy_types|length }}</b><span>能源类型</span></div>
             <div><b>{{ catalog.body_types|length }}</b><span>车身类型</span></div>
             <div><b>{{ catalog.brands|length }}</b><span>品牌</span></div>
           </div>
           <div class="spark-line"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <small>价格来自离线数据快照，仅用于课程演示</small>
+          <small>离线数据，仅供课程演示。实际价格以成交信息为准。</small>
         </aside>
       </section>
 
@@ -58,9 +58,9 @@
         <div class="section-heading">
           <div>
             <p class="step-label">01 / 填写条件</p>
-            <h2>你真正需要什么？</h2>
+            <h2>设置筛选条件</h2>
           </div>
-          <p>预算是唯一必填项。选择越具体，筛选越准确。</p>
+          <p>预算必填；其他条件不选则不参与筛选。</p>
         </div>
 
         {% if dataset_error %}
@@ -128,13 +128,13 @@
             </select>
           </div>
           <div class="form-actions">
-            <label class="switch-row" title="未配置或请求失败时自动使用模板说明">
+            <label class="switch-row" title="未配置或调用失败时使用本地模板">
               <input id="use_llm" name="use_llm" type="checkbox" {% if not llm_enabled %}disabled{% endif %}>
               <span class="switch"></span>
-              <span>{{ llm_label }} 说明 <small>{{ llm_model if llm_enabled else '未配置' }}</small></span>
+              <span>{{ llm_label }} 改写 <small>{{ llm_model if llm_enabled else '未配置' }}</small></span>
             </label>
             <button class="primary-button" type="submit" {% if dataset_error %}disabled{% endif %}>
-              <span>开始推荐</span><b>→</b>
+              <span>筛选车型</span><b>→</b>
             </button>
           </div>
         </form>
@@ -144,7 +144,7 @@
         <div class="section-heading">
           <div>
             <p class="step-label">02 / 推荐结果</p>
-            <h2>为你筛出的候选</h2>
+            <h2>候选车型</h2>
           </div>
           <p id="result-summary"></p>
         </div>
@@ -152,20 +152,20 @@
         <div id="recommendation-grid" class="recommendation-grid"></div>
         <div class="compare-bar" id="compare-bar">
           <div><strong id="compare-count">0</strong><span>已选车型</span></div>
-          <p>选择 2—3 款车型，查看参数横向对比</p>
-          <button id="compare-button" type="button" disabled>开始对比 <span>→</span></button>
+          <p>选择 2—3 款后对比参数</p>
+          <button id="compare-button" type="button" disabled>对比 <span>→</span></button>
         </div>
       </section>
 
       <section class="comparison shell is-hidden" id="comparison-section">
         <div class="section-heading">
-          <div><p class="step-label">03 / 车型对比</p><h2>关键参数，一眼看清</h2></div>
-          <button class="text-button" id="close-comparison" type="button">收起对比 ×</button>
+          <div><p class="step-label">03 / 车型对比</p><h2>车型参数对比</h2></div>
+          <button class="text-button" id="close-comparison" type="button">关闭对比 ×</button>
         </div>
         <div class="comparison-layout">
           <div class="comparison-table-wrap"><table id="comparison-table"></table></div>
           <div class="chart-panel">
-            <div><span>六维相对表现</span><small>缺失数据按 0 显示</small></div>
+            <div><span>价格与销量</span><small>原始值 · 缺失销量不计为 0</small></div>
             <div id="comparison-chart" class="chart"></div>
           </div>
         </div>
@@ -173,12 +173,12 @@
 
       <section class="insight shell">
         <div class="section-heading compact">
-          <div><p class="step-label">SPARK / 数据统计</p><h2>看懂当前车型库</h2></div>
-          <p>图表由 Spark 标准数据生成，反映当前离线快照。</p>
+          <div><p class="step-label">SPARK / 数据统计</p><h2>车型库统计</h2></div>
+          <p>基于 Spark 处理后的离线数据。</p>
         </div>
         <div class="insight-grid">
-          <article><div><h3>能源类型分布</h3><p>当前车型库的动力结构</p></div><div id="energy-chart" class="chart"></div></article>
-          <article><div><h3>车身类型分布</h3><p>不同用车形态的样本数量</p></div><div id="body-chart" class="chart"></div></article>
+          <article><div><h3>能源类型分布</h3><p>按能源类型统计车型数</p></div><div id="energy-chart" class="chart"></div></article>
+          <article><div><h3>车身类型分布</h3><p>按车身类型统计车型数</p></div><div id="body-chart" class="chart"></div></article>
         </div>
       </section>
 
@@ -186,33 +186,31 @@
         <div class="analysis-heading">
           <div>
             <p class="step-label">DATA EVIDENCE / 参数分析</p>
-            <h2 id="analysis-title">看清推荐背后的数据依据。</h2>
+            <h2 id="analysis-title">参数与销量分析</h2>
           </div>
           <div class="analysis-period" aria-label="分析数据期间">
             <span>销量期间</span>
             <strong id="analysis-period">加载中</strong>
           </div>
         </div>
-        <p class="analysis-lead">结合 Spearman 参数相关与随机森林重要度，了解不同参数在当前数据中的统计表现。分析结果仅用于辅助理解推荐依据，不代表单一参数与销量之间存在因果关系。</p>
+        <p class="analysis-lead">展示 Spearman 相关系数和随机森林重要度。结果只表示当前样本中的统计关联，不表示因果关系。</p>
 
         <div id="analysis-loading" class="analysis-state" role="status" aria-live="polite">
           <span class="analysis-spinner" aria-hidden="true"></span>
-          <div><strong>正在构建分析工作台</strong><p>读取模型指标与参数重要度…</p></div>
+          <div><strong>正在加载分析结果</strong><p>读取指标与参数明细…</p></div>
         </div>
         <div id="analysis-error" class="analysis-state analysis-state-error is-hidden" role="alert">
-          <div><strong>分析结果暂不可用</strong><p id="analysis-error-message">请稍后重试。</p></div>
+          <div><strong>无法加载分析结果</strong><p id="analysis-error-message">可重试。</p></div>
           <button id="analysis-retry" type="button">重新加载</button>
         </div>
 
         <div id="analysis-dashboard" class="is-hidden">
           <div class="analysis-kpis" id="analysis-kpis" aria-label="分析关键指标"></div>
 
-          <div id="analysis-warnings" class="analysis-warnings is-hidden" role="note"></div>
-
           <div class="analysis-toolbar">
             <div>
-              <p class="analysis-kicker">参数探索器</p>
-              <h3>特征贡献与方向</h3>
+              <p class="analysis-kicker">参数筛选</p>
+              <h3>重要度与相关方向</h3>
             </div>
             <label for="analysis-group-filter">参数分组
               <select id="analysis-group-filter"><option value="">全部分组</option></select>
@@ -221,7 +219,7 @@
 
           <article class="analysis-panel analysis-paired-panel">
             <div class="panel-heading">
-              <div><h3>参数重要度与相关方向</h3><p>按随机森林重要度选取 Top 12；同一水平行展示同一参数的 Spearman 相关系数</p></div>
+              <div><h3>参数重要度与相关方向</h3><p>展示随机森林重要度最高的 12 项参数及其 Spearman 相关系数</p></div>
               <div class="direction-legend"><span class="positive">正相关</span><span class="negative">负相关</span><span class="zero">零相关</span><span class="missing">不可计算</span></div>
             </div>
             <div class="analysis-chart-viewport">
@@ -231,7 +229,7 @@
           </article>
 
           <article class="analysis-panel analysis-table-panel">
-            <div class="panel-heading"><div><h3>全量参数证据明细</h3><p id="analysis-table-caption">187 项来源参数，按随机森林重要度排序</p></div><span class="panel-chip" id="analysis-result-count">0 项</span></div>
+            <div class="panel-heading"><div><h3>参数明细</h3><p id="analysis-table-caption">187 项来源参数，按随机森林重要度排序</p></div><span class="panel-chip" id="analysis-result-count">0 项</span></div>
             <div class="analysis-table-wrap">
               <table class="analysis-table">
                 <thead><tr><th scope="col">参数</th><th scope="col">分组 / 类型</th><th scope="col">Spearman ρ</th><th scope="col">FDR q</th><th scope="col">RF 重要度</th><th scope="col">判断</th></tr></thead>
@@ -244,8 +242,8 @@
     </main>
 
     <footer class="shell">
-      <span>选车罗盘 · Spark Car Recommendation MVP</span>
-      <span>确定性算法 · 公开数据快照 · 本地优先</span>
+      <span>车型筛选 · Spark Recommendation</span>
+      <span>规则评分 · 离线数据 · 结果可复现</span>
     </footer>
 
     <div id="toast" class="toast" role="status"></div>

@@ -77,6 +77,7 @@ def test_compare_accepts_two_or_three_known_cars(sample_cars):
     cars = engine.compare(["car_0", "car_1"])
     assert [car["car_id"] for car in cars] == ["car_0", "car_1"]
     assert [car["sales"] for car in cars] == [1200, 900]
+    assert [car["trim_count"] for car in cars] == [3, 4]
 
     with pytest.raises(RecommendationError) as captured:
         engine.compare(["car_0"])

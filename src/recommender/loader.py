@@ -14,7 +14,7 @@ FLOAT_FIELDS = {
     "normalized_heat",
     "data_completeness",
 }
-INTEGER_FIELDS = {"seats", "horsepower", "model_year", "sales"}
+INTEGER_FIELDS = {"seats", "horsepower", "model_year", "sales", "trim_count"}
 
 
 def _number(value: str | None, converter):

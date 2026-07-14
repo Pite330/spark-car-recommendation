@@ -53,6 +53,7 @@ def test_health_recommend_and_compare(dataset_file):
     compared = client.post("/api/compare", json={"car_ids": ids})
     assert compared.status_code == 200
     assert [car["car_id"] for car in compared.json["cars"]] == ids
+    assert all("trim_count" in car for car in compared.json["cars"])
 
 
 def test_llm_failure_keeps_template_result(dataset_file, monkeypatch):

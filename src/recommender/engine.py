@@ -33,6 +33,8 @@ PUBLIC_FIELDS = [
     "data_completeness",
 ]
 
+COMPARISON_FIELDS = [*PUBLIC_FIELDS, "trim_count"]
+
 
 class RecommendationEngine:
     def __init__(self, cars: list[dict[str, object]]) -> None:
@@ -227,7 +229,7 @@ class RecommendationEngine:
         return [
             {
                 field: self.by_id[str(car_id)][field]
-                for field in PUBLIC_FIELDS
+                for field in COMPARISON_FIELDS
                 if self.by_id[str(car_id)].get(field) not in (None, "")
             }
             for car_id in car_ids

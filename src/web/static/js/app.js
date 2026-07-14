@@ -49,7 +49,7 @@ function recommendationCard(car, index) {
       <div class="tags">${tags}</div>
       <p class="reason">${escapeHtml(car.reason)}</p>
       <div class="card-footer">
-        <span class="reason-source">${car.reason_source === 'llm' ? (car.reason_provider === 'deepseek' ? 'DeepSeek 说明' : '自然语言说明') : '规则模板说明'}</span>
+        <span class="reason-source">${car.reason_source === 'llm' ? (car.reason_provider === 'deepseek' ? 'DeepSeek 改写' : '模型改写') : '规则生成'}</span>
         <label class="compare-toggle"><input type="checkbox" data-car-id="${escapeHtml(car.car_id)}"> 加入对比</label>
       </div>
     </article>`;
@@ -103,13 +103,13 @@ form?.addEventListener('submit', async (event) => {
     comparisonSection.classList.add('is-hidden');
     recommendationsGrid.innerHTML = latestRecommendations.map(recommendationCard).join('');
     resultSummary.textContent = body.total_candidates
-      ? `共找到 ${body.total_candidates} 款候选，按匹配得分稳定排序。`
-      : '当前条件下没有候选，请调整预算或核心偏好。';
+      ? `候选 ${body.total_candidates} 款，按匹配分从高到低排序。`
+      : '无符合条件的车型。';
     relaxedNote.classList.toggle('is-hidden', body.relaxed_conditions.length === 0);
     relaxedNote.textContent = body.relaxed_conditions.length
-      ? `为保证候选数量，系统已放宽：${body.relaxed_conditions.join('；')}` : '';
+      ? `候选不足，已放宽：${body.relaxed_conditions.join('；')}` : '';
     if (!latestRecommendations.length) {
-      recommendationsGrid.innerHTML = '<div class="alert warning">没有返回无关车型。建议扩大预算，或调整车身 / 能源类型后重试。</div>';
+      recommendationsGrid.innerHTML = '<div class="alert warning">请扩大预算，或减少车身 / 能源限制后重试。</div>';
     }
     resultsSection.classList.remove('is-hidden');
     resultsSection.scrollIntoView({behavior: 'smooth', block: 'start'});
@@ -125,6 +125,7 @@ const comparisonRows = [
   ['车型', 'model_name', (v) => v],
   ['品牌', 'brand', (v) => v],
   ['参考价格', 'price_min_wan', (v, car) => displayPrice(car)],
+  ['在售配置数', 'trim_count', (v) => `${v} 款`],
   ['车身类型', 'body_type', (v) => v],
   ['能源类型', 'energy_type', (v) => v],
   ['月销量', 'sales', (v) => `${Number(v).toLocaleString('zh-CN')} 辆`],
@@ -132,8 +133,7 @@ const comparisonRows = [
   ['座位数', 'seats', (v) => `${v} 座`],
   ['续航', 'range_km', (v) => `${Number(v).toFixed(0)} km`],
   ['标注功率', 'horsepower', (v) => `${v} hp`],
-  ['车型年款', 'model_year', (v) => v],
-  ['数据完整度', 'data_completeness', (v) => `${Math.round(Number(v) * 100)}%`]
+  ['车型年款', 'model_year', (v) => v]
 ];
 
 function renderComparison(cars) {
@@ -145,57 +145,76 @@ function renderComparison(cars) {
   if (!window.echarts) return;
   if (compareChart) compareChart.dispose();
   compareChart = echarts.init(document.querySelector('#comparison-chart'));
-  const priceValues = cars.map((car) => Number(car.price_min_wan) || 0);
-  const minPrice = Math.min(...priceValues);
-  const maxPrice = Math.max(...priceValues);
-  const maxHorsepower = Math.max(...cars.map((car) => Number(car.horsepower) || 0), 1);
-  const maxSeats = Math.max(...cars.map((car) => Number(car.seats) || 0), 1);
-  const yearValues = cars.map((car) => Number(car.model_year) || 0).filter(Boolean);
-  const minYear = yearValues.length ? Math.min(...yearValues) : 0;
-  const maxYear = yearValues.length ? Math.max(...yearValues) : 0;
-  const dimensions = ['价格优势', '动力水平', '座位空间', '车型新鲜度', '市场热度', '数据完整度'];
-
-  function radarValues(car) {
-    const price = Number(car.price_min_wan) || 0;
-    const priceAdvantage = maxPrice === minPrice ? 100 : 30 + 70 * (maxPrice - price) / (maxPrice - minPrice);
-    const horsepower = car.horsepower == null ? 0 : 100 * Number(car.horsepower) / maxHorsepower;
-    const seats = car.seats == null ? 0 : 100 * Number(car.seats) / maxSeats;
-    const year = Number(car.model_year) || 0;
-    const freshness = !year ? 0 : maxYear === minYear ? 100 : 50 + 50 * (year - minYear) / (maxYear - minYear);
-    const heat = car.normalized_heat == null ? 0 : 100 * Number(car.normalized_heat);
-    const completeness = car.data_completeness == null ? 0 : 100 * Number(car.data_completeness);
-    return [priceAdvantage, horsepower, seats, freshness, heat, completeness].map((value) => Math.max(0, Math.min(100, Number(value.toFixed(1)))));
-  }
+  const modelNames = cars.map((car) => car.model_name);
+  const priceValues = cars.map((car) => Number(car.price_min_wan));
+  const salesValues = cars.map((car) => car.sales == null
+    ? {value: 0, missing: true, itemStyle: {opacity: 0}}
+    : {value: Number(car.sales), missing: false});
 
   compareChart.setOption({
-    color: ['#1b5e44', '#ff7a3d', '#5572c9'],
+    color: ['#176246', '#e56f3a'],
+    animationDuration: 520,
+    animationEasing: 'cubicOut',
     tooltip: {
-      trigger: 'item',
-      formatter: ({name, value}) => `<strong>${escapeHtml(name)}</strong><br>${dimensions.map((label, index) => `${label} ${formatDecimal(value[index], 1)}`).join('<br>')}`
+      trigger: 'axis',
+      axisPointer: {type: 'shadow'},
+      backgroundColor: 'rgba(25, 39, 32, .96)',
+      borderWidth: 0,
+      padding: [12, 14],
+      textStyle: {color: '#fffef8', fontSize: 12, lineHeight: 21},
+      formatter: (params) => {
+        const car = cars[params[0].dataIndex];
+        const sales = car.sales == null ? '暂无' : `${Number(car.sales).toLocaleString('zh-CN')} 辆`;
+        return `<strong>${escapeHtml(car.model_name)}</strong><br>参考起售价　${formatDecimal(car.price_min_wan, 2)} 万元<br>同期月销量　${sales}`;
+      }
     },
     legend: {
-      type: 'scroll', orient: 'horizontal', left: 'center', bottom: 10, width: '84%',
-      itemWidth: 16, itemHeight: 9, itemGap: 18,
-      textStyle: {color: '#637068', fontSize: 11}
+      orient: 'horizontal', left: 'center', top: 10,
+      icon: 'roundRect', itemWidth: 18, itemHeight: 7, itemGap: 22,
+      textStyle: {color: '#4f5f56', fontSize: 11, fontWeight: 600}
     },
-    radar: {
-      center: ['50%', '43%'], radius: '58%', splitNumber: 4,
-      indicator: dimensions.map((name) => ({name, max: 100})),
-      axisName: {color: '#637068', fontSize: 12, padding: [4, 6]},
-      axisLine: {lineStyle: {color: '#cfd6d1'}},
-      splitLine: {lineStyle: {color: '#d9ddd8'}},
-      splitArea: {show: true, areaStyle: {color: ['rgba(27,94,68,.015)', 'rgba(27,94,68,.045)']}}
+    grid: {left: 62, right: 66, top: 62, bottom: 74},
+    xAxis: {
+      type: 'category',
+      data: modelNames,
+      axisTick: {show: false},
+      axisLine: {lineStyle: {color: 'rgba(27,94,68,.18)'}},
+      axisLabel: {
+        interval: 0, color: '#4f5f56', fontSize: 11, fontWeight: 600,
+        width: 95, overflow: 'truncate', margin: 16
+      }
     },
-    series: [{
-      type: 'radar', symbolSize: 7,
-      lineStyle: {width: 2.5, opacity: .92},
-      itemStyle: {borderColor: '#fffef8', borderWidth: 1.5},
-      data: cars.map((car) => ({
-        name: car.model_name,
-        value: radarValues(car),
-        areaStyle: {opacity: .08}
-      }))
-    }]
+    yAxis: [
+      {
+        type: 'value', name: '万元', min: 0, splitNumber: 4,
+        nameTextStyle: {color: '#65736b', padding: [0, 0, 8, 0]},
+        axisLabel: {color: '#7b8780', formatter: '{value}'},
+        splitLine: {lineStyle: {color: 'rgba(27,94,68,.09)'}}
+      },
+      {
+        type: 'value', name: '辆 / 月', min: 0, splitNumber: 4,
+        nameTextStyle: {color: '#65736b', padding: [0, 0, 8, 0]},
+        axisLabel: {color: '#7b8780', formatter: (value) => Number(value).toLocaleString('zh-CN')},
+        splitLine: {show: false}
+      }
+    ],
+    series: [
+      {
+        name: '参考起售价', type: 'bar', yAxisIndex: 0, data: priceValues,
+        barMaxWidth: 34, barGap: '28%',
+        itemStyle: {borderRadius: [8, 8, 2, 2]},
+        label: {show: true, position: 'top', color: '#176246', fontSize: 10, fontWeight: 700, formatter: ({value}) => `${formatDecimal(value, 2)} 万`}
+      },
+      {
+        name: '同期月销量', type: 'bar', yAxisIndex: 1, data: salesValues,
+        barMaxWidth: 34,
+        itemStyle: {borderRadius: [8, 8, 2, 2]},
+        label: {
+          show: true, position: 'top', color: '#c65e30', fontSize: 10, fontWeight: 700,
+          formatter: ({data, value}) => data.missing ? '暂无' : Number(value).toLocaleString('zh-CN')
+        }
+      }
+    ]
   });
 }
 
@@ -205,7 +224,6 @@ compareButton.addEventListener('click', async () => {
     const body = await response.json();
     if (!response.ok) throw new Error(body.error?.message || '车型对比失败');
     comparisonSection.classList.remove('is-hidden');
-    // 先显示容器，再初始化 ECharts。隐藏容器的宽高为 0，会导致雷达图缩在左侧并裁切标签。
     window.requestAnimationFrame(() => {
       renderComparison(body.cars);
       comparisonSection.scrollIntoView({behavior: 'smooth'});
@@ -263,7 +281,6 @@ const analysisUi = {
   dashboard: document.querySelector('#analysis-dashboard'),
   period: document.querySelector('#analysis-period'),
   kpis: document.querySelector('#analysis-kpis'),
-  warnings: document.querySelector('#analysis-warnings'),
   filter: document.querySelector('#analysis-group-filter'),
   tableBody: document.querySelector('#analysis-table-body'),
   resultCount: document.querySelector('#analysis-result-count'),
@@ -295,9 +312,9 @@ function analysisRows(group = '') {
 function renderAnalysisKpis(data) {
   const items = [
     ['分析样本', data.analysis_rows, '同期车系销量记录'],
-    ['原始参数', data.parameter_definitions, '进入 Adapter 前'],
-    ['标准特征', data.adapter_features, '完成统一编码'],
-    ['显著信号', data.significant_features, 'FDR 校正后']
+    ['原始参数', data.parameter_definitions, '映射前字段'],
+    ['标准特征', data.adapter_features, '编码后特征'],
+    ['显著信号', data.significant_features, 'FDR q ≤ 0.05']
   ];
   analysisUi.kpis.innerHTML = items.map(([label, value, note]) => `
     <article class="analysis-kpi"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value ?? '—')}</strong><small>${escapeHtml(note)}</small></article>
@@ -305,7 +322,7 @@ function renderAnalysisKpis(data) {
 }
 
 function signalFor(parameter) {
-  const strengthLabels = {strong: '强证据', moderate: '中等证据', weak: '弱证据', not_evaluated: '未评估'};
+  const strengthLabels = {strong: '强信号', moderate: '中等信号', weak: '弱信号', not_evaluated: '未评估'};
   const directionLabels = {positive: '正向', negative: '负向', mixed: '方向混合', neutral: '中性', not_evaluated: ''};
   if (parameter.evidence_strength) {
     const strength = strengthLabels[parameter.evidence_strength] || parameter.evidence_strength;
@@ -455,10 +472,6 @@ function renderAnalysis(data) {
   analysisUi.period.textContent = data.sales_period || '未标注';
   renderAnalysisKpis(data);
 
-  const warnings = Array.isArray(data.warnings) ? data.warnings.filter(Boolean) : [];
-  analysisUi.warnings.classList.toggle('is-hidden', warnings.length === 0);
-  analysisUi.warnings.textContent = warnings.length ? `分析提示：${warnings.join('；')}` : '';
-
   const groups = [...new Set(analysisRows().map((row) => row.group_name || '其他'))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
   analysisUi.filter.innerHTML = '<option value="">全部分组</option>' + groups.map((group) => `<option value="${escapeHtml(group)}">${escapeHtml(group)}</option>`).join('');
   renderFilteredAnalysis();
@@ -474,7 +487,6 @@ async function loadAnalysis() {
     if (!response.ok) throw new Error(body.error?.message || '分析接口请求失败');
     if (!body.available) throw new Error((body.warnings || []).join('；') || '尚未生成参数销量分析结果');
     analysisData = body;
-    // ECharts 初始化时需要可见容器，否则会读取到 0 宽高。
     analysisUi.dashboard.classList.remove('is-hidden');
     renderAnalysis(body);
   } catch (error) {
