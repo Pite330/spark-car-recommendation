@@ -1,10 +1,3 @@
-"""低频采集 16888 在售车系的完整配置参数和月销量历史。
-
-脚本先缓存每个车系的公开参数 JSON 和销量 HTML，再生成适合 Spark 清洗与
-参数分析的规范化完整表。运行中断后可以直接重跑；已存在的原始响应默认不会
-重复请求。
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -234,8 +227,6 @@ SALES_FIELDS = [
 
 
 def clean_value(value: object) -> str:
-    """将接口中的 HTML 实体和极少量标签转换为可分析文本。"""
-
     text = html.unescape(str(value or "")).replace("\xa0", " ")
     if "<" in text and ">" in text:
         text = BeautifulSoup(text, "html.parser").get_text(" ", strip=True)
@@ -248,8 +239,6 @@ def split_parameter_unit(parameter_name: str) -> tuple[str, str]:
 
 
 def numeric_value(value_text: str) -> tuple[str, str]:
-    """只解析完整的单一数值，避免把尺寸、前后轮胎等复合值误当成数值。"""
-
     match = re.fullmatch(r"([-+]?\d+(?:\.\d+)?)\s*(万|%|[A-Za-z]+(?:/[A-Za-z0-9]+)?|公里|小时|秒)?", value_text)
     if not match:
         return "", ""

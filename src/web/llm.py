@@ -8,8 +8,6 @@ import requests
 
 
 class LLMReasonWriter:
-    """DeepSeek / OpenAI 兼容接口适配；失败时保留模板原因。"""
-
     def __init__(self) -> None:
         self.enabled = os.getenv("LLM_ENABLED", "false").lower() == "true"
         self.provider = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
@@ -75,7 +73,6 @@ class LLMReasonWriter:
             ],
         }
         if self.provider == "deepseek":
-            # 短句改写不需要推理链；DeepSeek V4 默认开启思考，需显式关闭。
             payload["thinking"] = {"type": "disabled"}
 
         response = requests.post(

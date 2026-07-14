@@ -1,9 +1,3 @@
-"""将 UTF-8 Markdown 转换为适合课程提交的 A4 PDF。
-
-Markdown 是唯一可编辑源文件；PDF 仅作为同名派生产物。支持标题、段落、
-有序/无序列表、引用、代码块、表格，以及 ``<!-- pagebreak -->`` 分页标记。
-"""
-
 from __future__ import annotations
 
 import argparse

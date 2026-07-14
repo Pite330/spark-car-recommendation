@@ -1,5 +1,3 @@
-"""用 PySpark 清洗 16888 公开车型快照并生成推荐主表与统计证据。"""
-
 from __future__ import annotations
 
 import argparse
@@ -10,7 +8,6 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Hadoop 3 在 Java 23 上调用 Subject.getSubject 时需要显式允许兼容模式。
 os.environ.setdefault("JAVA_TOOL_OPTIONS", "-Djava.security.manager=allow")
 
 from pyspark.sql import DataFrame, SparkSession
@@ -245,7 +242,6 @@ def full_tables_dataframe(spark: SparkSession, tables: Path) -> DataFrame:
 
 
 def clean_dataframe(raw: DataFrame) -> DataFrame:
-    """标准化字段并生成可解释特征，不推断 16888 未提供的续航等参数。"""
     body_type = (
         F.when(F.col("level_name").contains("SUV"), "SUV")
         .when(F.col("level_name").contains("MPV"), "MPV")

@@ -1,5 +1,3 @@
-"""将 16888 完整配置长表适配为车系特征，并分析其与同月销量的关联。"""
-
 from __future__ import annotations
 
 import argparse
@@ -150,7 +148,6 @@ def spearman(values_x: list[float], values_y: list[float]) -> tuple[float, float
         return rho, float("nan")
     bounded = min(abs(rho), 0.999999)
     statistic = bounded * math.sqrt((len(values_x) - 2) / max(1 - bounded**2, 1e-12))
-    # n >= 30 时使用正态近似；本项目保留的特征至少覆盖 20% 同月样本。
     p_value = math.erfc(statistic / math.sqrt(2))
     return rho, p_value
 
@@ -301,7 +298,6 @@ def build_controls(parameters: DataFrame, trims: DataFrame) -> DataFrame:
 
 
 def build_target(sales: DataFrame) -> tuple[str, DataFrame]:
-    """使用全表共同最新月份的车系销量，保持横截面分析口径一致。"""
     latest_period = sales.filter(F.col("sales").isNotNull()).agg(F.max("sales_period")).first()[0]
     target = (
         sales.filter((F.col("sales_period") == latest_period) & (F.col("sales") >= 0))
@@ -379,8 +375,6 @@ def pipeline_for(feature_columns: list[str], estimator, *, scale_features: bool 
         )
     )
     if scale_features:
-        # Elastic Net 的惩罚依赖特征量纲。仅做方差缩放、不中心化，避免 One-Hot
-        # 向量被转成稠密向量；截距仍可吸收均值差异。
         stages.append(
             StandardScaler(
                 inputCol="features",
@@ -517,12 +511,6 @@ def summarize_evidence(
     fdr_q_value: float | None,
     elastic_net_coefficient: float | None,
 ) -> tuple[str, str]:
-    """把三种模型信号压缩成保守、可解释的证据标签。
-
-    随机森林重要度没有方向，且基于结点不纯度的数值偏向会放大连续特征，
-    因而不参与证据强度或方向判定，只作为补充排序信息输出。
-    """
-
     if spearman_rho is None or math.isnan(spearman_rho):
         return "not_evaluated", "not_evaluated"
 
@@ -567,8 +555,6 @@ def consolidated_parameter_results(
     associations: list[dict[str, object]],
     importance_rows: list[dict[str, object]],
 ) -> list[dict[str, object]]:
-    """合并质量、单变量和模型结果；未建模参数也保留一行供 API 加载。"""
-
     association_by_feature = {str(row["feature_name"]): row for row in associations}
     importance_by_feature = {str(row["feature_name"]): row for row in importance_rows}
     results: list[dict[str, object]] = []
@@ -599,7 +585,6 @@ def consolidated_parameter_results(
                 "random_forest_importance": importance.get("random_forest_importance", ""),
                 "evidence_strength": strength,
                 "association_direction": direction,
-                # 当前只有单期配置快照，年款也不是参数生效时间，禁止输出趋势判断。
                 "trend_status": "insufficient_history",
             }
         )

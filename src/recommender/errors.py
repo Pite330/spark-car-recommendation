@@ -2,8 +2,6 @@ from __future__ import annotations
 
 
 class RecommendationError(ValueError):
-    """可安全返回给调用方的请求或数据错误。"""
-
     def __init__(
         self,
         code: str,

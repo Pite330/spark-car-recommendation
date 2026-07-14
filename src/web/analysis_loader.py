@@ -16,7 +16,7 @@ METRIC_LABELS = {
 
 def _number(value: object) -> float | None:
     try:
-        number = float(value)  # type: ignore[arg-type]
+        number = float(value)
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
@@ -61,7 +61,6 @@ def _safe_read(
 
 
 def load_analysis_overview(analysis_dir: Path, limit: int = 24) -> dict[str, object]:
-    """加载可选的离线分析结果；任何单文件失败都返回可序列化的降级响应。"""
     warnings: list[str] = []
     metrics_data, metrics_ok = _safe_read(
         analysis_dir, "model_metrics.json", _read_json, warnings

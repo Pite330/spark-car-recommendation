@@ -119,7 +119,6 @@ def create_app(
                     item["reason_source"] = "llm"
                     item["reason_provider"] = llm.provider
                 except (requests.RequestException, RuntimeError, ValueError, KeyError, TypeError):
-                    # 模板原因已由算法生成，任何外部失败都不改变车型、得分或依据。
                     item["reason_source"] = "template"
                     item.pop("reason_provider", None)
         result["request_id"] = f"local-{uuid.uuid4().hex[:8]}"
